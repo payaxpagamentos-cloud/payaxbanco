@@ -1,7 +1,7 @@
 'use strict';
 
 const { ErroNegocio } = require('./erros');
-const { conferirEndereco } = require('./relay');
+const { buscarSeguro } = require('./relay');
 
 /**
  * Listas públicas de canais (projeto iptv-org): um catálogo aberto com o nome, a categoria e o
@@ -20,11 +20,11 @@ const cache = { em: 0, canais: null, fluxos: null, logos: null, logosEm: 0 };
 const VALIDADE_MS = 10 * 60_000;
 
 async function baixarJson(url, timeoutMs) {
-  await conferirEndereco(url);
   let resp;
   try {
-    resp = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'PLAYTECHVIP/1.0' }, signal: AbortSignal.timeout(timeoutMs) });
+    resp = await buscarSeguro(url, { headers: { 'User-Agent': 'PLAYTECHVIP/1.0' }, signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
+    if (err instanceof ErroNegocio) throw err;
     throw new ErroNegocio(`Não foi possível baixar a lista pública (${err.name === 'TimeoutError' ? 'tempo esgotado' : 'falha de rede'}).`, 504);
   }
   if (!resp.ok) throw new ErroNegocio(`A lista pública respondeu ${resp.status}.`, 502);

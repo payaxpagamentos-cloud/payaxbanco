@@ -34,6 +34,16 @@ export const sessao = {
       try { localStorage.removeItem(CHAVE_SESSAO); } catch { /* ignora */ }
     }
   },
+  /**
+   * Troca só o token, mantendo a sessão onde ela já estava ("lembrar de mim" ou só esta aba).
+   * Serve à troca de senha: o servidor encerra todas as sessões da conta e devolve um token
+   * novo para este aparelho — sem guardá-lo, a própria pessoa cairia junto com os invasores.
+   */
+  trocarToken(token) {
+    const atual = this.get();
+    if (!atual || !token) return;
+    this.set({ ...atual, token }, { lembrar: Boolean(ler(CHAVE_SESSAO)) });
+  },
   limpar() {
     memoria = null;
     try { localStorage.removeItem(CHAVE_SESSAO); localStorage.removeItem(CHAVE_PERFIL); } catch { /* ignora */ }

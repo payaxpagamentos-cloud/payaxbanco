@@ -2,7 +2,7 @@
 
 const { Router } = require('express');
 const { transacao, agora, mascoteDe } = require('../db');
-const { emitirToken } = require('../auth');
+const { emitirToken, encerrarSessoes } = require('../auth');
 const { hashSenha, verificarSenha } = require('../lib/senha');
 const { ErroNegocio } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
@@ -74,8 +74,12 @@ module.exports = (db, autenticado) => {
     const u = db.prepare('SELECT senha_hash FROM usuarios WHERE id = ?').get(req.usuario.id);
     if (!verificarSenha(String(req.body.atual ?? ''), u.senha_hash)) throw new ErroNegocio('Senha atual incorreta.', 422);
     db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(hashSenha(v.senha(req.body.nova)), req.usuario.id);
+    // Trocar a senha é o que a pessoa faz quando desconfia que alguém entrou na conta. Então
+    // todas as sessões caem — e este aparelho, que acabou de provar que sabe a senha atual,
+    // recebe um token novo para não ser deslogado junto.
+    encerrarSessoes(db, req.usuario.id);
     registrar(db, req, 'senha_trocada');
-    res.status(204).end();
+    res.json({ token: emitirToken(db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.usuario.id)) });
   });
 
   return r;

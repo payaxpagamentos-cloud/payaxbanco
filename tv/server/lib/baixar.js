@@ -2,7 +2,7 @@
 
 const config = require('../config');
 const { ErroNegocio } = require('./erros');
-const { conferirEndereco } = require('./relay');
+const { buscarSeguro, lerCorpoLimitado } = require('./relay');
 
 /**
  * Busca de imagens na internet (logos das emissoras, cartazes e banners do catálogo),
@@ -24,15 +24,15 @@ function refererDe(url) {
 
 /** Baixa uma imagem e devolve o conteúdo. Lança ErroNegocio com o motivo quando não dá. */
 async function baixarImagem(url, { tentativas = 4 } = {}) {
-  await conferirEndereco(url);
   let resp;
   for (let tentativa = 0; tentativa < tentativas; tentativa += 1) {
     // Espera dobrando (2s, 4s, 8s): é o que serve contra limite de frequência de quem hospeda
     // as imagens, que costuma responder 403 ou 429 quando chegam muitas seguidas.
     if (tentativa) await esperar(2000 * (2 ** (tentativa - 1)));
     try {
-      resp = await fetch(url, {
-        redirect: 'follow',
+      // Confere o endereço em cada salto: logo de emissora vem de servidor de terceiros, e um
+      // redirecionamento para a rede interna passaria direto com 'follow'.
+      resp = await buscarSeguro(url, {
         headers: {
           'User-Agent': 'PLAYTECHVIP/1.0',
           Accept: 'image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8',
@@ -41,6 +41,8 @@ async function baixarImagem(url, { tentativas = 4 } = {}) {
         signal: AbortSignal.timeout(30_000),
       });
     } catch (err) {
+      // Endereço recusado não melhora tentando de novo.
+      if (err instanceof ErroNegocio) throw err;
       if (tentativa === tentativas - 1) {
         throw new ErroNegocio(`Não foi possível baixar a imagem (${err.name === 'TimeoutError' ? 'tempo esgotado' : 'falha de rede'}).`, 504);
       }
@@ -52,10 +54,8 @@ async function baixarImagem(url, { tentativas = 4 } = {}) {
     if (resp.ok || ![403, 429, 500, 502, 503].includes(resp.status)) break;
   }
   if (!resp.ok) throw new ErroNegocio(`O endereço da imagem respondeu ${resp.status}.`, 502);
-  const tamanho = Number(resp.headers.get('content-length')) || 0;
-  if (tamanho > config.arteMaxBytes) throw new ErroNegocio('A imagem passa do tamanho permitido.', 413);
-  const buf = Buffer.from(await resp.arrayBuffer());
-  if (buf.length > config.arteMaxBytes) throw new ErroNegocio('A imagem passa do tamanho permitido.', 413);
+  // Lê até o teto e para: antes o corpo inteiro ia para a memória e só depois era medido.
+  const buf = await lerCorpoLimitado(resp, config.arteMaxBytes, 'A imagem');
   if (buf.length < 200) throw new ErroNegocio('O endereço não devolveu uma imagem.', 422);
   return buf;
 }

@@ -531,6 +531,12 @@ function migrar(db) {
   // esticando, contra ~768 copiando.
   if (!colunas.includes('melhoria')) db.exec("ALTER TABLE canais ADD COLUMN melhoria TEXT NOT NULL DEFAULT 'nenhuma'");
 
+  // A partir de que instante (ms) as sessões desta conta valem. Trocar a senha grava "agora"
+  // aqui, e todo token emitido antes deixa de servir. Sem isto, senha trocada não derrubava
+  // ninguém: quem já estava dentro continuava dentro até o token vencer — 30 dias no assinante.
+  const colunasUsuarios = db.prepare('PRAGMA table_info(usuarios)').all().map((c) => c.name);
+  if (!colunasUsuarios.includes('sessoes_desde_ms')) db.exec('ALTER TABLE usuarios ADD COLUMN sessoes_desde_ms INTEGER');
+
   const colunasPerfis = db.prepare('PRAGMA table_info(perfis)').all().map((c) => c.name);
   if (!colunasPerfis.includes('avatar')) {
     db.exec('ALTER TABLE perfis ADD COLUMN avatar TEXT');

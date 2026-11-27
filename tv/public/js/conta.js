@@ -110,8 +110,9 @@ export async function telaConta(raiz, { ir, aoMudar }) {
     });
     if (!dados) return;
     try {
-      await api.post('/auth/senha', dados);
-      toast('Senha trocada.');
+      const r = await api.post('/auth/senha', dados);
+      sessao.trocarToken(r?.token);
+      toast('Senha trocada. Os outros aparelhos desta conta foram desconectados.');
     } catch (err) { toast(err.message, true); }
   });
 

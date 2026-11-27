@@ -208,24 +208,40 @@ function importarXmltv(db, xml, { canalId = null, porIdExterno = {}, substituir 
   return { ...resultado, canais: resultado.canais.size };
 }
 
+const GRADE_MAX_BYTES = 96 * 1024 * 1024;          // como chega (comprimida ou não)
+const GRADE_ABERTA_MAX_BYTES = 384 * 1024 * 1024;  // depois de descompactada
+
 /**
  * Busca um XMLTV num endereço e importa. Serve para a grade dos canais abertos: a operação
  * cadastra o endereço do provedor que ela escolheu e a plataforma atualiza sozinha, uma vez por dia.
  * Aceita arquivo .xml e .xml.gz (o formato que a maioria dos provedores publica).
  */
-async function importarDeUrl(db, url, { substituir = true, timeoutMs = 60_000 } = {}) {
-  const { conferirEndereco } = require('./relay');
-  await conferirEndereco(url);
+async function importarDeUrl(db, url, { substituir = true, timeoutMs = 60_000, maxBytes = GRADE_MAX_BYTES, maxAbertoBytes = GRADE_ABERTA_MAX_BYTES } = {}) {
+  const { buscarSeguro, lerCorpoLimitado } = require('./relay');
   let resp;
   try {
-    resp = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'PLAYTECHVIP/1.0', Accept: '*/*' }, signal: AbortSignal.timeout(timeoutMs) });
+    resp = await buscarSeguro(url, { headers: { 'User-Agent': 'PLAYTECHVIP/1.0', Accept: '*/*' }, signal: AbortSignal.timeout(timeoutMs) });
   } catch (err) {
+    if (err instanceof ErroNegocio) throw err;
     throw new ErroNegocio(`Não foi possível buscar a grade (${err.name === 'TimeoutError' ? 'tempo esgotado' : 'falha de rede'}).`, 504);
   }
   if (!resp.ok) throw new ErroNegocio(`O provedor da grade respondeu ${resp.status}.`, 502);
-  const bruto = Buffer.from(await resp.arrayBuffer());
+  // Dois tetos, porque são dois jeitos de derrubar o servidor com um arquivo de grade: mandar
+  // muito, ou mandar pouco que vira muito. Um .gz de 1 MB pode abrir em vários GB ("bomba de
+  // compressão") — e isto roda sozinho todo dia, no mesmo processo que mantém os canais no ar.
+  // A grade de uma operadora inteira fica em dezenas de MB; os tetos passam bem longe disso.
+  const bruto = await lerCorpoLimitado(resp, maxBytes, 'O arquivo da grade');
   const comprimido = bruto[0] === 0x1f && bruto[1] === 0x8b;
-  const xml = (comprimido ? require('node:zlib').gunzipSync(bruto) : bruto).toString('utf8');
+  let aberto = bruto;
+  if (comprimido) {
+    try {
+      aberto = require('node:zlib').gunzipSync(bruto, { maxOutputLength: maxAbertoBytes });
+    } catch (err) {
+      if (err.code === 'ERR_BUFFER_TOO_LARGE') throw new ErroNegocio('O arquivo da grade passa do tamanho permitido depois de descompactado.', 413);
+      throw new ErroNegocio('O arquivo da grade está corrompido (não deu para descompactar).', 502);
+    }
+  }
+  const xml = aberto.toString('utf8');
   const saida = importarXmltv(db, xml, { substituir });
   const { gravarConfig } = require('../db');
   gravarConfig(db, { epg_importado_em: agora() });

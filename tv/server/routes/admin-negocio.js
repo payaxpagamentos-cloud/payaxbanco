@@ -7,7 +7,7 @@ const { ErroNegocio, naoEncontrado } = require('../lib/erros');
 const crypto = require('node:crypto');
 const { hashSenha } = require('../lib/senha');
 const { registrar } = require('../lib/auditoria');
-const { permitir } = require('../auth');
+const { permitir, encerrarSessoes } = require('../auth');
 const { hoje, somarDias } = require('../lib/datas');
 const { enviarCsv, reais } = require('../lib/csv');
 const assinaturas = require('../lib/assinaturas');
@@ -207,6 +207,8 @@ module.exports = (db) => {
     if (req.body.telefone !== undefined) db.prepare('UPDATE usuarios SET telefone = ? WHERE id = ?').run(req.body.telefone ? v.telefone(req.body.telefone) : null, u.id);
     if (req.body.senha !== undefined) {
       db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(hashSenha(v.senha(req.body.senha)), u.id);
+      // Quem pede senha nova ao atendimento é quem perdeu o controle da conta: as sessões caem.
+      encerrarSessoes(db, u.id);
       registrar(db, req, 'assinante_senha_trocada', { id: u.id });
     }
     res.json({ assinante: { id: u.id, ativo: Boolean(db.prepare('SELECT ativo FROM usuarios WHERE id = ?').get(u.id).ativo) } });
@@ -385,7 +387,12 @@ module.exports = (db) => {
       if (!v.booleano(d.ativo) && u.perfil === 'admin' && outros === 0) throw new ErroNegocio('A plataforma precisa de pelo menos um administrador ativo.', 409);
       db.prepare('UPDATE usuarios SET ativo = ? WHERE id = ?').run(v.booleano(d.ativo) ? 1 : 0, u.id);
     }
-    if (d.senha !== undefined) db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(hashSenha(v.senha(d.senha)), u.id);
+    if (d.senha !== undefined) {
+      db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(hashSenha(v.senha(d.senha)), u.id);
+      // Conta da operação é a que mais importa derrubar: uma sessão de administrador esquecida
+      // num aparelho continua mandando na plataforma até vencer.
+      encerrarSessoes(db, u.id);
+    }
     registrar(db, req, 'equipe_alterada', { id: u.id });
     res.json({ usuario: db.prepare('SELECT id, nome, email, perfil, ativo FROM usuarios WHERE id = ?').get(u.id) });
   });

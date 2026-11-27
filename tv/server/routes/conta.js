@@ -35,6 +35,39 @@ const pin = (valor) => {
   return t;
 };
 
+/**
+ * Freio nas tentativas de PIN, por perfil.
+ *
+ * PIN tem de 4 a 6 números: dez mil combinações no caso comum. Sem freio, quem está com o
+ * aparelho logado (a criança, que é exatamente de quem o PIN protege) acha o PIN em minutos
+ * com um laço de pedidos. E cada conferência roda scrypt, que segura o servidor por dezenas de
+ * milissegundos — o mesmo laço, além de quebrar o PIN, engasgava a plataforma para todo mundo.
+ *
+ * Cinco erros seguidos travam o perfil por cinco minutos. Acertar zera a conta. Fica em
+ * memória de propósito: reiniciar o servidor zera, e isso é aceitável para o que se protege.
+ */
+const PIN_MAX_ERROS = 5;
+const PIN_TRAVA_MS = 5 * 60_000;
+const errosDePin = new Map();   // perfilId -> { erros, ate }
+
+function conferirPin(perfil, valor) {
+  const agoraMs = Date.now();
+  const reg = errosDePin.get(perfil.id);
+  if (reg && reg.ate > agoraMs) {
+    const falta = Math.ceil((reg.ate - agoraMs) / 60_000);
+    throw new ErroNegocio(`Muitas tentativas de PIN. Tente de novo em ${falta} minuto${falta > 1 ? 's' : ''}.`, 429, { pin: true });
+  }
+  if (verificarSenha(String(valor ?? ''), perfil.pin_hash)) {
+    errosDePin.delete(perfil.id);
+    return true;
+  }
+  const erros = (reg && reg.ate <= agoraMs && reg.erros >= PIN_MAX_ERROS ? 0 : reg?.erros ?? 0) + 1;
+  errosDePin.set(perfil.id, { erros, ate: erros >= PIN_MAX_ERROS ? agoraMs + PIN_TRAVA_MS : 0 });
+  // O mapa não cresce sem fim: registro velho e destravado sai na passada.
+  if (errosDePin.size > 5000) for (const [k, x] of errosDePin) if (x.ate && x.ate <= agoraMs) errosDePin.delete(k);
+  return false;
+}
+
 /** Minha conta: planos, assinatura, faturas, perfis de visualização e telas em uso. */
 module.exports = (db) => {
   const r = Router();
@@ -177,10 +210,10 @@ module.exports = (db) => {
     if (d.pin !== undefined) {
       // Para tirar o PIN é preciso informar o atual (quem está na sala com a TV não desliga o bloqueio sozinho).
       if (d.pin === null || d.pin === '') {
-        if (p.pin_hash && !verificarSenha(String(d.pin_atual ?? ''), p.pin_hash)) throw new ErroNegocio('Informe o PIN atual para tirar o bloqueio.', 422);
+        if (p.pin_hash && !conferirPin(p, d.pin_atual)) throw new ErroNegocio('Informe o PIN atual para tirar o bloqueio.', 422);
         db.prepare('UPDATE perfis SET pin_hash = NULL WHERE id = ?').run(p.id);
       } else {
-        if (p.pin_hash && !verificarSenha(String(d.pin_atual ?? ''), p.pin_hash)) throw new ErroNegocio('PIN atual incorreto.', 422);
+        if (p.pin_hash && !conferirPin(p, d.pin_atual)) throw new ErroNegocio('PIN atual incorreto.', 422);
         db.prepare('UPDATE perfis SET pin_hash = ? WHERE id = ?').run(hashSenha(pin(d.pin)), p.id);
       }
     }
@@ -198,7 +231,7 @@ module.exports = (db) => {
   r.post('/perfis/:id/abrir', (req, res) => {
     const p = meuPerfil(req);
     if (!p.pin_hash) return res.json({ perfil: perfilPublico(p), chave: null });
-    if (!verificarSenha(String(req.body.pin ?? ''), p.pin_hash)) throw new ErroNegocio('PIN incorreto.', 422);
+    if (!conferirPin(p, req.body.pin)) throw new ErroNegocio('PIN incorreto.', 422);
     return res.json({ perfil: perfilPublico(p), chave: chavePerfil(p) });
   });
 

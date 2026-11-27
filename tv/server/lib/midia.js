@@ -225,6 +225,11 @@ function enviar(req, res, m, { download = false, cache = 'private, max-age=0, no
     'Accept-Ranges': 'bytes',
     'Cache-Control': cache,
     'X-Content-Type-Options': 'nosniff',
+    // SVG é documento, não só imagem: aberto direto no navegador ele pode carregar script, e os
+    // logos vêm de listas públicas, que não controlamos. Dentro de <img> nada disso roda; o
+    // 'sandbox' cobre o caso de alguém abrir o endereço da arte numa aba — o arquivo vira uma
+    // página sem script, sem formulário e sem acesso à sessão da plataforma.
+    ...(m.mime === 'image/svg+xml' ? { 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox" } : {}),
     ...(download ? { 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(m.nome_original)}` } : {}),
   };
   const faixa = /^bytes=(\d*)-(\d*)$/.exec(req.get('range') || '');

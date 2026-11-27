@@ -82,17 +82,79 @@ function lerUrlAssinada(canalId, valor) {
   }
 }
 
+const REDIRECIONA = [301, 302, 303, 307, 308];
+
+/**
+ * `fetch` que confere o endereço em CADA salto, e não só no primeiro.
+ *
+ * Com `redirect: 'follow'`, que era o que havia em todo lugar, a conferência de rede interna
+ * valia para o endereço cadastrado e para mais nada: bastava a origem responder
+ * "302 → http://10.0.0.1/..." e o servidor ia buscar lá dentro, sem pergunta. E a origem não é
+ * de confiança — canal de lista pública, logo de emissora e grade XMLTV vêm de servidores de
+ * terceiros. Num provedor isso pesa mais que o normal: a máquina da plataforma costuma enxergar
+ * a rede de gerência (roteador, OLT, painel interno), que é exatamente o que não pode ser
+ * alcançado a partir de um endereço que alguém de fora controla.
+ *
+ * Aqui o redirecionamento é seguido à mão: cada destino passa por `conferirEndereco` antes de
+ * ser buscado, e a corrente tem tamanho máximo.
+ *
+ * O que isto NÃO cobre: um nome que resolve para IP público na conferência e para IP interno
+ * na conexão (troca de DNS entre as duas consultas). Fechar isso exige fixar o IP na conexão;
+ * a defesa que não depende de DNS continua sendo o firewall de saída do servidor.
+ */
+async function buscarSeguro(url, opcoes = {}, { maxSaltos = 5 } = {}) {
+  let atual = String(url);
+  for (let salto = 0; salto <= maxSaltos; salto += 1) {
+    await conferirEndereco(atual);
+    const resp = await fetch(atual, { ...opcoes, redirect: 'manual' });
+    if (!REDIRECIONA.includes(resp.status)) return resp;
+    const destino = resp.headers.get('location');
+    if (!destino) return resp;
+    try { await resp.body?.cancel(); } catch { /* corpo já fechado */ }
+    try {
+      atual = new URL(destino, atual).toString();
+    } catch {
+      throw new ErroNegocio('A origem redirecionou para um endereço inválido.', 502);
+    }
+  }
+  throw new ErroNegocio('A origem redirecionou vezes demais.', 502);
+}
+
+/**
+ * Lê o corpo de uma resposta até um teto, e para ali.
+ *
+ * `resp.arrayBuffer()` carrega tudo na memória antes de qualquer conferência de tamanho, e o
+ * `content-length` é só o que o outro lado DIZ que vai mandar. Um servidor de terceiros que
+ * responda com alguns GB derrubaria o processo — e, com ele, todos os canais no ar.
+ */
+async function lerCorpoLimitado(resp, maximo, oQue = 'O arquivo') {
+  const declarado = Number(resp.headers.get('content-length')) || 0;
+  if (declarado > maximo) throw new ErroNegocio(`${oQue} passa do tamanho permitido.`, 413);
+  if (!resp.body) return Buffer.alloc(0);
+  const partes = [];
+  let total = 0;
+  for await (const pedaco of resp.body) {
+    total += pedaco.length;
+    if (total > maximo) {
+      try { await resp.body.cancel(); } catch { /* já fechado */ }
+      throw new ErroNegocio(`${oQue} passa do tamanho permitido.`, 413);
+    }
+    partes.push(pedaco);
+  }
+  return Buffer.concat(partes);
+}
+
 async function buscar(url, { metodo = 'GET', cabecalhos = {} } = {}) {
-  await conferirEndereco(url);
   let resp;
   try {
-    resp = await fetch(url, {
+    resp = await buscarSeguro(url, {
       method: metodo,
-      redirect: 'follow',
       headers: { 'User-Agent': config.relay.userAgent, Accept: '*/*', ...cabecalhos },
       signal: AbortSignal.timeout(config.relay.timeoutMs),
     });
   } catch (err) {
+    // Recusa por endereço interno ou corrente longa já vem com o motivo certo: não vira "falha de rede".
+    if (err instanceof ErroNegocio) throw err;
     throw new ErroNegocio(`A origem do sinal não respondeu (${err.name === 'TimeoutError' ? 'tempo esgotado' : 'falha de rede'}).`, 504);
   }
   return resp;
@@ -239,4 +301,4 @@ async function verificarSinais(db, { apenas = null } = {}) {
   return resultados;
 }
 
-module.exports = { ipPrivado, conferirEndereco, assinarUrl, lerUrlAssinada, reescrever, listaReescrita, cabecalhosDoCanal, repassarSegmento, verificarCanal, verificarSinais, cacheLista };
+module.exports = { ipPrivado, conferirEndereco, buscarSeguro, lerCorpoLimitado, assinarUrl, lerUrlAssinada, reescrever, listaReescrita, cabecalhosDoCanal, repassarSegmento, verificarCanal, verificarSinais, cacheLista };

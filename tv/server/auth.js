@@ -9,8 +9,18 @@ const assinar = (dados) => crypto.createHmac('sha256', config.secret).update(dad
 /** Token assinado (HMAC) com o id do usuário e a validade. O perfil de acesso é sempre lido do banco. */
 function emitirToken(usuario) {
   const ttl = usuario.perfil === 'assinante' ? config.tokenTtlSeconds : config.tokenOperacaoTtlSeconds;
-  const payload = Buffer.from(JSON.stringify({ sub: usuario.id, aud: 'tv', exp: Math.floor(Date.now() / 1000) + ttl })).toString('base64url');
+  // `em` é o instante da emissão, em milissegundos: é o que permite derrubar as sessões
+  // anteriores a uma troca de senha (ver `sessoes_desde_ms` em `autenticar`).
+  const payload = Buffer.from(JSON.stringify({ sub: usuario.id, aud: 'tv', em: Date.now(), exp: Math.floor(Date.now() / 1000) + ttl })).toString('base64url');
   return `${payload}.${assinar(payload)}`;
+}
+
+/**
+ * Encerra todas as sessões abertas de uma conta: tokens emitidos até agora deixam de valer.
+ * É o que se chama quando a senha muda — por quem é dono da conta ou pela operação.
+ */
+function encerrarSessoes(db, usuarioId) {
+  db.prepare('UPDATE usuarios SET sessoes_desde_ms = ? WHERE id = ?').run(Date.now(), Number(usuarioId));
 }
 
 function lerToken(token) {
@@ -28,13 +38,20 @@ function lerToken(token) {
 }
 
 function autenticar(db) {
-  const buscar = db.prepare('SELECT id, nome, email, telefone, perfil, ativo FROM usuarios WHERE id = ?');
+  const buscar = db.prepare('SELECT id, nome, email, telefone, perfil, ativo, sessoes_desde_ms FROM usuarios WHERE id = ?');
   return (req, _res, next) => {
     const c = req.get('authorization') || '';
     const dados = lerToken(c.startsWith('Bearer ') ? c.slice(7) : null);
     if (!dados) return next(new ErroNegocio('Sessão inválida ou expirada.', 401));
-    const usuario = buscar.get(dados.sub);
-    if (!usuario || !usuario.ativo) return next(new ErroNegocio('Conta desativada.', 401));
+    const linha = buscar.get(dados.sub);
+    if (!linha || !linha.ativo) return next(new ErroNegocio('Conta desativada.', 401));
+    // Senha trocada depois da emissão deste token: a sessão acabou. Token antigo, de antes de
+    // existir o campo `em`, só é recusado se a conta já teve as sessões encerradas alguma vez —
+    // assim a atualização da plataforma não desloga ninguém à toa.
+    if (linha.sessoes_desde_ms && !(Number(dados.em) >= linha.sessoes_desde_ms)) {
+      return next(new ErroNegocio('Sua senha foi trocada. Entre de novo.', 401));
+    }
+    const { sessoes_desde_ms: _desde, ...usuario } = linha;
     req.usuario = usuario;
     next();
   };
@@ -102,4 +119,4 @@ function comPerfilVisualizacao(db) {
   };
 }
 
-module.exports = { emitirToken, lerToken, autenticar, permitir, comPerfilVisualizacao, chavePerfil, conferirChavePerfil };
+module.exports = { emitirToken, lerToken, encerrarSessoes, autenticar, permitir, comPerfilVisualizacao, chavePerfil, conferirChavePerfil };
