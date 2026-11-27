@@ -1079,6 +1079,80 @@ test('Rastreador', async (t) => {
     assert.ok(jan.lancamentos.some((l) => l.categoria === 'multa' && l.data === `${anoD}-01-15`));
     assert.ok(!fev.lancamentos.some((l) => l.data === `${anoD}-01-15`));
     assert.equal(fev.totais.ipva_centavos, 0, 'o IPVA vence em dezembro');
+    // Financeiro: contas a pagar e a receber, parcelas, baixa, saldo das contas, o que vem da frota, fluxo e resultado.
+    {
+      const F = `${G}/financeiro`;
+      const catF = (await api.get(`${F}/catalogos`, cliente)).dados;
+      assert.ok(catF.categorias.some((c) => c.nome === 'Combustível' && c.tipo === 'despesa'), 'categorias de referência criadas no primeiro uso');
+      const caixa = catF.contas[0];
+      assert.equal(caixa.nome, 'Caixa');
+      const banco = (await api.post(`${F}/contas`, { nome: 'Banco', tipo: 'banco', saldo_inicial_centavos: 500000 }, cliente)).dados.id;
+      const despesa = catF.categorias.find((c) => c.nome === 'Aluguel').id;
+      const receita = catF.categorias.find((c) => c.nome === 'Fretes').id;
+      assert.equal((await api.post(`${F}/lancamentos`, { tipo: 'pagar', descricao: 'x', valor_centavos: 100, vencimento: hojeIso }, operador)).status, 403, 'operador só consulta');
+      assert.equal((await api.post(`${F}/lancamentos`, { tipo: 'pagar', descricao: 'Sem valor', valor_centavos: 0, vencimento: hojeIso }, cliente)).status, 422);
+      assert.equal((await api.post(`${F}/lancamentos`, { tipo: 'pagar', descricao: 'Categoria do lado errado', valor_centavos: 100, vencimento: hojeIso, categoria_id: receita }, cliente)).status, 422);
+      // Parcelado: 1.000,00 em 3 vezes, o resto dos centavos na última, um mês entre cada uma.
+      const parc = await api.post(`${F}/lancamentos`, { tipo: 'pagar', descricao: 'Compra de peças', valor_centavos: 100000, vencimento: '2026-01-31', modo: 'parcelado', parcelas: 3, categoria_id: despesa }, cliente);
+      assert.equal(parc.dados.ids.length, 3);
+      const linhasP = db.prepare('SELECT valor_centavos, vencimento, parcela FROM fin_lancamentos WHERE id IN (?, ?, ?) ORDER BY parcela').all(...parc.dados.ids);
+      assert.deepEqual(linhasP.map((x) => x.valor_centavos), [33333, 33333, 33334]);
+      assert.deepEqual(linhasP.map((x) => x.vencimento), ['2026-01-31', '2026-02-28', '2026-03-31'], 'dia 31 vira o último dia do mês curto');
+      // Todo mês: o mesmo valor repetido.
+      const rec = await api.post(`${F}/lancamentos`, { tipo: 'pagar', descricao: 'Aluguel do galpão', valor_centavos: 250000, vencimento: hojeIso, modo: 'recorrente', parcelas: 4, categoria_id: despesa }, cliente);
+      assert.equal(rec.dados.ids.length, 4);
+      const aluguel = rec.dados.ids[0];
+      // Conta a receber e as duas baixas: o saldo do banco sobe com o recebimento e desce com o pagamento.
+      const frete = (await api.post(`${F}/lancamentos`, { tipo: 'receber', descricao: 'Frete SP-Campinas', pessoa: 'Cliente A', valor_centavos: 800000, vencimento: hojeIso, categoria_id: receita, veiculo_id: veiculo }, cliente)).dados.ids[0];
+      assert.equal((await api.post(`${F}/lancamentos/${frete}/baixar`, { conta_id: 999999 }, cliente)).status, 404);
+      assert.equal((await api.post(`${F}/lancamentos/${frete}/baixar`, { conta_id: banco, data: daqui(1) }, cliente)).status, 422, 'baixa no futuro');
+      assert.equal((await api.post(`${F}/lancamentos/${frete}/baixar`, { conta_id: banco, forma: 'pix' }, cliente)).status, 200);
+      assert.equal((await api.post(`${F}/lancamentos/${frete}/baixar`, { conta_id: banco }, cliente)).status, 422, 'não dá baixa duas vezes');
+      assert.equal((await api.post(`${F}/lancamentos/${aluguel}/baixar`, { conta_id: banco, valor_pago_centavos: 255000 }, cliente)).status, 200, 'pago com juros');
+      assert.equal((await api.put(`${F}/lancamentos/${aluguel}`, { descricao: 'outra' }, cliente)).status, 422, 'conta paga não se edita');
+      assert.equal((await api.del(`${F}/lancamentos/${aluguel}`, undefined, cliente)).status, 422, 'conta paga não se exclui');
+      const saldo = async (id) => (await api.get(`${F}/contas`, cliente)).dados.contas.find((c) => c.id === id).saldo_centavos;
+      assert.equal(await saldo(banco), 500000 + 800000 - 255000);
+      // Transferência entre contas e estorno da baixa.
+      assert.equal((await api.post(`${F}/transferencias`, { de_conta_id: banco, para_conta_id: banco, valor_centavos: 100 }, cliente)).status, 422);
+      assert.equal((await api.post(`${F}/transferencias`, { de_conta_id: banco, para_conta_id: caixa.id, valor_centavos: 20000 }, cliente)).status, 201);
+      assert.equal(await saldo(banco), 500000 + 800000 - 255000 - 20000);
+      assert.equal(await saldo(caixa.id), 20000);
+      assert.equal((await api.post(`${F}/lancamentos/${aluguel}/estornar`, {}, cliente)).status, 200);
+      assert.equal(await saldo(banco), 500000 + 800000 - 20000);
+      assert.equal((await api.post(`${F}/lancamentos/${aluguel}/baixar`, { conta_id: banco }, cliente)).status, 200);
+      // Excluir uma parcela com "todas": saem só as que estão em aberto do mesmo lançamento.
+      assert.equal((await api.del(`${F}/lancamentos/${rec.dados.ids[1]}?todas=1`, undefined, cliente)).dados.excluidas, 3);
+      // O que a frota gerou vira conta a pagar uma vez só; a baixa marca o documento como pago lá.
+      const docF = (await api.post(`${G}/documentos`, { tipo: 'seguro', veiculo_id: veiculo, vencimento: daqui(40), valor_centavos: 90000 }, cliente)).dados.id;
+      const pend = (await api.get(`${F}/frota`, cliente)).dados;
+      const itemDoc = pend.find((x) => x.origem === 'documento' && x.origem_id === docF);
+      assert.ok(itemDoc && pend.some((x) => x.origem === 'os'), 'documento e OS concluída aparecem para trazer');
+      assert.equal((await api.post(`${F}/frota`, { itens: [itemDoc, itemDoc, { origem: 'documento', origem_id: 999999 }] }, cliente)).dados.criadas, 1);
+      assert.ok(!(await api.get(`${F}/frota`, cliente)).dados.some((x) => x.origem === 'documento' && x.origem_id === docF), 'não entra duas vezes');
+      const contaDoc = db.prepare("SELECT id, categoria_id FROM fin_lancamentos WHERE origem = 'documento' AND origem_id = ?").get(docF);
+      assert.equal(db.prepare('SELECT nome FROM fin_categorias WHERE id = ?').get(contaDoc.categoria_id).nome, 'Seguro');
+      await api.post(`${F}/lancamentos/${contaDoc.id}/baixar`, { conta_id: banco }, cliente);
+      assert.equal(db.prepare('SELECT pago FROM frota_documentos WHERE id = ?').get(docF).pago, 1, 'o documento fica pago na frota');
+      await api.post(`${F}/lancamentos/${contaDoc.id}/estornar`, {}, cliente);
+      assert.equal(db.prepare('SELECT pago FROM frota_documentos WHERE id = ?').get(docF).pago, 0);
+      // Listas, resumo e resultado.
+      const abertas = (await api.get(`${F}/lancamentos?tipo=pagar&status=aberto`, cliente)).dados;
+      assert.ok(abertas.itens.some((x) => x.situacao === 'vencido' && x.descricao === 'Compra de peças'), 'parcela de janeiro está vencida');
+      assert.equal((await api.get(`${F}/lancamentos?tipo=receber&status=pago`, cliente)).dados.itens[0].valor_pago_centavos, 800000);
+      const res = (await api.get(`${F}/resumo`, cliente)).dados;
+      assert.equal(res.saldo_centavos, 500000 + 800000 - 250000);
+      assert.equal(res.mes.resultado_centavos, 800000 - 250000);
+      assert.equal(res.meses.length, 7);
+      assert.ok(res.pagar.vencido_centavos >= 33333);
+      const dre = (await api.get(`${F}/resultado`, cliente)).dados;
+      assert.equal(dre.resultado_centavos, 800000 - 250000);
+      assert.equal(dre.despesas[0].categoria, 'Aluguel');
+      assert.equal(dre.veiculos[0].receita_centavos, 800000);
+      // Conta de outra empresa não existe para esta; o módulo desligado fecha o financeiro (conferido adiante).
+      assert.equal((await api.put(`${F}/categorias/999999`, { nome: 'x' }, cliente)).status, 404);
+    }
+
     // Empresa que contratou só a Gestão de Frota (sem rastreamento): o módulo, os cadastros e as multas; nada de mapa, alertas ou comandos.
     assert.equal((await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: false, rastreamento: false }, master)).status, 422, 'ao menos um produto');
     assert.equal((await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: true, rastreamento: false, preco_centavos: 9900 }, master)).status, 204);
@@ -1104,6 +1178,8 @@ test('Rastreador', async (t) => {
     assert.ok(vs.length && vs.every((x) => x.lat === undefined && x.imei === undefined), 'veículos sem posição nem rastreador');
     assert.equal((await api.get(`${G}/motoristas`, soFrota)).status, 200);
     assert.equal((await api.get(`${base()}/multas`, soFrota)).status, 200, 'as multas fazem parte do módulo');
+    assert.equal((await api.get(`${G}/financeiro/resumo`, soFrota)).status, 200, 'o financeiro faz parte do módulo');
+    assert.equal((await api.post(`${G}/financeiro/lancamentos`, { tipo: 'receber', descricao: 'Frete', valor_centavos: 5000, vencimento: hojeIso }, soFrota)).status, 201);
     for (const rota of ['/veiculos', '/dashboard', '/alertas', '/motoristas', '/configuracoes', `/veiculos/${veiculo}`]) {
       assert.equal((await api.get(`${base()}${rota}`, soFrota)).status, 403, `bloqueado: ${rota}`);
     }
@@ -1118,6 +1194,7 @@ test('Rastreador', async (t) => {
     await api.put(`/master/empresas/${empresa}/gestao-frota`, { ativo: false }, master);
     assert.equal((await api.get(`${G}/painel`, cliente)).status, 403);
     assert.equal((await api.get(base(), soFrota)).status, 403, 'sem o módulo, o usuário só da frota não entra');
+    assert.equal((await api.get(`${G}/financeiro/resumo`, cliente)).status, 403, 'sem o módulo, o financeiro fecha');
     assert.equal((await api.post(`${base()}/usuarios`, { nome: 'X', email: 'x2@rota.com', senha: 'senha-qualquer', perfil: 'operador', acesso: 'frota' }, cliente)).status, 422);
     db.prepare('UPDATE usuarios SET ativo = 0 WHERE id = ?').run(uf.dados.id);
     db.prepare('UPDATE veiculos SET tipo = ? WHERE id = ?').run(tipoAntes, veiculo);

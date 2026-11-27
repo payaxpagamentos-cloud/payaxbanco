@@ -14,6 +14,7 @@ const { ErroNegocio } = require('../lib/erros');
 const { registrar } = require('../lib/auditoria');
 const { hoje, somarDias } = require('../lib/datas');
 const gf = require('../lib/gestaoFrota');
+const fin = require('../lib/financeiro');
 
 module.exports = (db) => {
   const r = Router();
@@ -109,6 +110,50 @@ module.exports = (db) => {
     if (de > ate || (Date.parse(ate) - Date.parse(de)) / 86_400_000 > 400) throw new ErroNegocio('Período inválido (até 400 dias).', 422);
     res.json(gf.custos(db, eid(req), de, ate));
   });
+
+  // ---------- Financeiro: contas a pagar e a receber, contas e caixas, fluxo e resultado ----------
+  const F = '/financeiro';
+  r.get(`${F}/catalogos`, (req, res) => res.json({ tipos_conta: fin.TIPOS_CONTA, formas: fin.FORMAS, contas: fin.listarContas(db, eid(req)), categorias: fin.listarCategorias(db, eid(req)) }));
+  r.get(`${F}/resumo`, (req, res) => res.json(fin.resumo(db, eid(req))));
+  r.get(`${F}/resultado`, (req, res) => {
+    const ate = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.ate ?? '')) ? req.query.ate : hoje();
+    const de = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.de ?? '')) ? req.query.de : `${ate.slice(0, 7)}-01`;
+    if (de > ate) throw new ErroNegocio('Período inválido.', 422);
+    res.json(fin.resultado(db, eid(req), de, ate));
+  });
+  r.get(`${F}/lancamentos`, (req, res) => res.json(fin.listar(db, eid(req), { tipo: req.query.tipo, status: req.query.status || 'aberto', de: req.query.de || undefined, ate: req.query.ate || undefined,
+    veiculoId: req.query.veiculo_id || undefined, busca: req.query.busca || undefined })));
+  r.post(`${F}/lancamentos`, (req, res) => {
+    const ids = fin.criar(db, eid(req), req.body, uid(req));
+    registrar(db, req, 'financeiro_conta_criada', { tipo: req.body.tipo, parcelas: ids.length });
+    res.status(201).json({ ids });
+  });
+  r.put(`${F}/lancamentos/:id`, (req, res) => { fin.editar(db, eid(req), req.params.id, req.body); ok(res); });
+  r.post(`${F}/lancamentos/:id/baixar`, (req, res) => {
+    fin.baixar(db, eid(req), req.params.id, req.body);
+    registrar(db, req, 'financeiro_baixa', { id: Number(req.params.id) });
+    ok(res);
+  });
+  r.post(`${F}/lancamentos/:id/estornar`, (req, res) => {
+    fin.estornar(db, eid(req), req.params.id);
+    registrar(db, req, 'financeiro_estorno', { id: Number(req.params.id) });
+    ok(res);
+  });
+  r.delete(`${F}/lancamentos/:id`, (req, res) => {
+    const n = fin.excluir(db, eid(req), req.params.id, { todas: req.query.todas === '1' || req.body?.todas === true });
+    registrar(db, req, 'financeiro_conta_excluida', { id: Number(req.params.id), quantidade: n });
+    res.json({ excluidas: n });
+  });
+  r.get(`${F}/frota`, (req, res) => res.json(fin.pendenciasDaFrota(db, eid(req))));
+  r.post(`${F}/frota`, (req, res) => res.status(201).json({ criadas: fin.importarDaFrota(db, eid(req), req.body.itens, uid(req)) }));
+  r.get(`${F}/contas`, (req, res) => res.json({ contas: fin.listarContas(db, eid(req)), transferencias: fin.listarTransferencias(db, eid(req)) }));
+  r.post(`${F}/contas`, (req, res) => res.status(201).json({ id: fin.salvarConta(db, eid(req), req.body) }));
+  r.put(`${F}/contas/:id`, (req, res) => { fin.salvarConta(db, eid(req), req.body, req.params.id); ok(res); });
+  r.post(`${F}/transferencias`, (req, res) => res.status(201).json({ id: fin.transferir(db, eid(req), req.body, uid(req)) }));
+  r.delete(`${F}/transferencias/:id`, (req, res) => { fin.excluirTransferencia(db, eid(req), req.params.id); res.status(204).end(); });
+  r.get(`${F}/categorias`, (req, res) => res.json(fin.listarCategorias(db, eid(req))));
+  r.post(`${F}/categorias`, (req, res) => res.status(201).json({ id: fin.salvarCategoria(db, eid(req), req.body) }));
+  r.put(`${F}/categorias/:id`, (req, res) => { fin.salvarCategoria(db, eid(req), req.body, req.params.id); ok(res); });
 
   // ---------- Detran (despesas do veículo com o governo: IPVA, licenciamento, seguro e multas) ----------
   r.get('/detran', (req, res) => res.json(gf.detran(db, eid(req), { ano: req.query.ano, mes: req.query.mes, veiculoId: req.query.veiculo_id || undefined })));

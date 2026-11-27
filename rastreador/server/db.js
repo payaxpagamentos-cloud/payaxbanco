@@ -302,6 +302,65 @@ CREATE TABLE IF NOT EXISTS frota_documentos (
 );
 CREATE INDEX IF NOT EXISTS idx_frota_documentos ON frota_documentos(empresa_id, vencimento);
 
+-- Financeiro da Gestão de Frota: contas e caixas, categorias, contas a pagar e a receber, e transferências entre contas.
+CREATE TABLE IF NOT EXISTS fin_contas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'banco' CHECK (tipo IN ('caixa','banco','cartao','outro')),
+  saldo_inicial_centavos INTEGER NOT NULL DEFAULT 0,
+  ativo INTEGER NOT NULL DEFAULT 1,
+  criado_em TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS fin_categorias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  nome TEXT NOT NULL,
+  tipo TEXT NOT NULL CHECK (tipo IN ('receita','despesa')),
+  ativo INTEGER NOT NULL DEFAULT 1
+);
+-- tipo: pagar ou receber. status: aberto, pago (recebido, no caso de receber) ou cancelado. origem: manual, ou de onde veio na
+-- frota (os, documento, multa), para não lançar a mesma coisa duas vezes e para dar a baixa lá também.
+CREATE TABLE IF NOT EXISTS fin_lancamentos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  tipo TEXT NOT NULL CHECK (tipo IN ('pagar','receber')),
+  descricao TEXT NOT NULL,
+  pessoa TEXT,
+  fornecedor_id INTEGER REFERENCES frota_fornecedores(id),
+  veiculo_id INTEGER REFERENCES veiculos(id) ON DELETE SET NULL,
+  categoria_id INTEGER REFERENCES fin_categorias(id),
+  documento TEXT,
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  vencimento TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'aberto' CHECK (status IN ('aberto','pago','cancelado')),
+  pago_em TEXT,
+  valor_pago_centavos INTEGER,
+  conta_id INTEGER REFERENCES fin_contas(id),
+  forma TEXT,
+  parcela INTEGER NOT NULL DEFAULT 1,
+  parcelas INTEGER NOT NULL DEFAULT 1,
+  grupo TEXT,
+  observacao TEXT,
+  origem TEXT NOT NULL DEFAULT 'manual',
+  origem_id INTEGER,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_fin_lancamentos ON fin_lancamentos(empresa_id, tipo, status, vencimento);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_fin_origem ON fin_lancamentos(empresa_id, origem, origem_id) WHERE origem <> 'manual' AND status <> 'cancelado';
+CREATE TABLE IF NOT EXISTS fin_transferencias (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+  de_conta_id INTEGER NOT NULL REFERENCES fin_contas(id),
+  para_conta_id INTEGER NOT NULL REFERENCES fin_contas(id),
+  valor_centavos INTEGER NOT NULL CHECK (valor_centavos > 0),
+  data TEXT NOT NULL,
+  observacao TEXT,
+  criado_por INTEGER REFERENCES usuarios(id),
+  criado_em TEXT NOT NULL
+);
+
 -- Nota do motorista por veículo e dia já fechado (motor ligado parado, tempo acima do limite, variações bruscas): calculado uma
 -- vez das posições e reaproveitado. Uma posição atrasada daquele dia apaga a linha (é recalculada na próxima consulta).
 CREATE TABLE IF NOT EXISTS desempenho_dia (

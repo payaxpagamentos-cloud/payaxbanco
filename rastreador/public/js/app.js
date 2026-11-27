@@ -16,6 +16,7 @@ import { TELAS_SEGUROS, TELAS_SEGUROS_MASTER } from './seguros.js';
 import { TELAS_CLIENTES } from './clientes.js';
 import { TELAS_MULTAS, TELAS_MULTAS_MASTER } from './multas.js';
 import { TELAS_GESTAO } from './gestao.js';
+import { TELAS_FINANCEIRO } from './financeiro.js';
 import { iniciarCena } from './cena-entrada.js';
 import { efeitosPausados, alternarEfeitos } from './efeitos.js';
 
@@ -93,6 +94,15 @@ const MENU_EMPRESA = [
     ['multas-consultar', 'Consultar débitos', 'lupa', 'Multas, IPVA, licenciamento e restrições de um veículo', null, 'oculta'],
     ['gestao-custos', 'Custos', 'carteira', 'Custo total e por km de cada veículo'],
   ], 'G'],
+  // Financeiro: faz parte da Gestão de Frota (contas a pagar e a receber, contas e caixas, fluxo e resultado).
+  ['financeiro', 'Financeiro', 'carteira', null, [
+    ['fin-resumo', 'Resumo', 'dashboard', 'Saldo, vencimentos e fluxo de caixa'],
+    ['fin-pagar', 'Contas a pagar', 'relatorios', 'Lançar, parcelar e pagar'],
+    ['fin-receber', 'Contas a receber', 'check', 'Fretes e serviços a receber'],
+    ['fin-contas', 'Contas e caixas', 'carteira', 'Bancos, caixa e transferências'],
+    ['fin-resultado', 'Resultado', 'rota', 'Receitas menos despesas'],
+    ['fin-categorias', 'Categorias', 'configuracoes', 'Grupos de receita e despesa'],
+  ], 'G'],
   // Cadastros (valem para os dois produtos). O que depende do GPS só aparece com o rastreamento.
   ['frota', 'Veículos e motoristas', 'veiculos', null, [
     ['veiculos', 'Veículos', 'veiculos', 'Cadastro, hodômetro e motorista fixo'],
@@ -138,7 +148,7 @@ const SUBTITULOS_MASTER = {
 const SUBTITULOS_EMPRESA = {
   dashboard: 'Resumo da frota, dos deslocamentos e dos alertas.', mapa: 'Última posição de cada veículo.', historico: 'Trajetos, paradas e viagens por período.',
   alertas: 'Ocorrências dos veículos e o que já foi tratado.', cercas: 'Áreas monitoradas: entrada, saída, horário e ação ao sair.',
-  seguranca: 'Modo Roubo, estacionados, bloqueio programado e liberações.', frota: 'Cadastro dos veículos e dos motoristas da empresa.',
+  seguranca: 'Modo Roubo, estacionados, bloqueio programado e liberações.', frota: 'Cadastro dos veículos e dos motoristas da empresa.', financeiro: 'Contas a pagar e a receber, saldos, fluxo de caixa e resultado.',
   relatorios: 'Relatórios por período e os que chegam sozinhos pelo WhatsApp.', configuracoes: 'Preferências, avisos pelo WhatsApp, comandos e integrações.',
   seguros: 'Seguros disponíveis para a sua frota, contratações e permissões.',
   'app-cliente': 'Usuários do app do cliente e as informações de atendimento.',
@@ -176,7 +186,7 @@ async function desenhar() {
   }
   const menu = empresaId ? MENU_EMPRESA : MENU_MASTER;
   const telas = empresaId
-    ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO, ...TELAS_SEGUROS, ...TELAS_CLIENTES, ...TELAS_MULTAS, ...TELAS_GESTAO }
+    ? { ...TELAS_EMPRESA, ...TELAS_SEGURANCA, ...TELAS_FROTA, ...TELAS_AVISOS, ...TELAS_DIARIO, ...TELAS_SEGUROS, ...TELAS_CLIENTES, ...TELAS_MULTAS, ...TELAS_GESTAO, ...TELAS_FINANCEIRO }
     : { ...TELAS_MASTER, ...TELAS_SEGUROS_MASTER, ...TELAS_MULTAS_MASTER };
   // Dados da empresa (nome e módulos contratados) antes do menu: um módulo não contratado não aparece nem abre.
   if (empresaId && !modulosEmpresa.has(empresaId)) {
@@ -197,7 +207,8 @@ async function desenhar() {
   if (tela === 'dashboard' && inicio !== 'dashboard') { tela = inicio; history.replaceState(null, '', link(empresaId, inicio)); }
   const permitido = (perfis) => !perfis || perfis.includes(u.perfil);
   const atende = (req) => String(req ?? '').split(' ').every((x) => (x === 'R' ? R : x === 'G' ? G : x === '!G' ? !G : true));
-  const contratado = (k, req) => (soFrota ? k === 'gestao' : true) && atende(req);
+  // O usuário "Somente Gestão de Frota" vê o módulo e o financeiro dele.
+  const contratado = (k, req) => (soFrota ? ['gestao', 'financeiro'].includes(k) : true) && atende(req);
   if (soFrota && empresaId && !modulos.gestao_frota) {
     return limpar(raiz, el('div', { class: 'cartao', style: 'max-width:520px;margin:15vh auto;padding:28px;text-align:center' },
       el('h2', {}, 'Gestão de Frota indisponível'),
