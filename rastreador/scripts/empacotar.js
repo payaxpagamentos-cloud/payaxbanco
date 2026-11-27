@@ -89,4 +89,9 @@ fs.writeFileSync(path.join(pasta, 'server', 'versao.json'), `${JSON.stringify({ 
 const zip = path.join(saida, `rastreador-${versao}.zip`);
 execFileSync('zip', ['-qr', zip, 'rastreador'], { cwd: saida });
 console.log(`Pacote: ${zip} (versão ${versao})`);
+// Pacote só de atualização: o painel (Configurações → Atualizar sistema) usa apenas server/ e public/. Sem as bibliotecas, o
+// arquivo fica com cerca de 1 MB e dá para baixar e enviar pelo celular. O completo é só para instalar num servidor novo.
+const zipAtualizacao = path.join(saida, `atualizacao-${versao}.zip`);
+execFileSync('zip', ['-qr', zipAtualizacao, 'rastreador/server', 'rastreador/public'], { cwd: saida });
+console.log(`Atualização: ${zipAtualizacao} (${Math.round(fs.statSync(zipAtualizacao).size / 1024)} KB)`);
 console.log(`Senha inicial do master (master@rastreador.com.br): ${senhaAdmin}`);
