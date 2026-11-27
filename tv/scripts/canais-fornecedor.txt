@@ -1,0 +1,350 @@
+LISTA DE CANAIS — INPUT SRT
+Total: 116 canais
+
+001 - TV_APARECIDA
+Input: srt://45.190.156.152:5000?streamid=#!::r=TV_APARECIDA,m=request latency=2000
+
+002 - REDE_VIDA
+Input: srt://45.190.156.152:5000?streamid=#!::r=REDE_VIDA,m=request latency=2000
+
+003 - NOVO_TEMPO
+Input: srt://45.190.156.152:5000?streamid=#!::r=NOVO_TEMPO,m=request latency=2000
+
+004 - DISCOVERY_KIDS
+Input: srt://45.190.156.152:5000?streamid=#!::r=DISCOVERY_KIDS,m=request latency=2000
+
+005 - BABY_TV
+Input: srt://45.190.156.152:5000?streamid=#!::r=BABY_TV,m=request latency=2000
+
+006 - ZOOMOO
+Input: srt://45.190.156.152:5000?streamid=#!::r=ZOOMOO,m=request latency=2000
+
+007 - ANIMES
+Input: srt://45.190.156.152:5000?streamid=#!::r=ANIMES,m=request latency=2000
+
+008 - NICK_JR
+Input: srt://45.190.156.152:5000?streamid=#!::r=NICK_JR,m=request latency=2000
+
+009 - GLOOBINHO
+Input: srt://45.190.156.152:5000?streamid=#!::r=GLOOBINHO,m=request latency=2000
+
+010 - CARTOON_NETWORK
+Input: srt://45.190.156.152:5000?streamid=#!::r=CARTOON_NETWORK,m=request latency=2000
+
+011 - CARTOONITO
+Input: srt://45.190.156.152:5000?streamid=#!::r=CARTOONITO,m=request latency=2000
+
+012 - TV_RA_TIM_BUM
+Input: srt://45.190.156.152:5000?streamid=#!::r=TV_RA_TIM_BUM,m=request latency=2000
+
+013 - GLOOB
+Input: srt://45.190.156.152:5000?streamid=#!::r=GLOOB,m=request latency=2000
+
+014 - NICKELODEON
+Input: srt://45.190.156.152:5000?streamid=#!::r=NICKELODEON,m=request latency=2000
+
+015 - ADULT_SWIM
+Input: srt://45.190.156.152:5000?streamid=#!::r=ADULT_SWIM,m=request latency=2000
+
+016 - CHAVES
+Input: srt://45.190.156.152:5000?streamid=#!::r=CHAVES,m=request latency=2000
+
+017 - CHAPOLIN
+Input: srt://45.190.156.152:5000?streamid=#!::r=CHAPOLIN,m=request latency=2000
+
+018 - CLASSICOS
+Input: srt://45.190.156.152:5000?streamid=#!::r=CLASSICOS,m=request latency=2000
+
+019 - FOOD_NETWORK
+Input: srt://45.190.156.152:5000?streamid=#!::r=FOOD_NETWORK,m=request latency=2000
+
+020 - SABOR_E_ARTE
+Input: srt://45.190.156.152:5000?streamid=#!::r=SABOR_E_ARTE,m=request latency=2000
+
+021 - REALITY
+Input: srt://45.190.156.152:5000?streamid=#!::r=REALITY,m=request latency=2000
+
+022 - GLOBO_PLAY_NOVELAS
+Input: srt://45.190.156.152:5000?streamid=#!::r=GLOBO_PLAY_NOVELAS,m=request latency=2000
+
+023 - MULTISHOW
+Input: srt://45.190.156.152:5000?streamid=#!::r=MULTISHOW,m=request latency=2000
+
+024 - BIS
+Input: srt://45.190.156.152:5000?streamid=#!::r=BIS,m=request latency=2000
+
+025 - DISCOVERY_WORLD
+Input: srt://45.190.156.152:5000?streamid=#!::r=DISCOVERY_WORLD,m=request latency=2000
+
+026 - DISCOVERY_CHANNEL
+Input: srt://45.190.156.152:5000?streamid=#!::r=DISCOVERY_CHANNEL,m=request latency=2000
+
+027 - DISCOVERY_HOME_E_HEALTH
+Input: srt://45.190.156.152:5000?streamid=#!::r=DISCOVERY_HOME_E_HEALTH,m=request latency=2000
+
+028 - DISCOVERY_THEATER
+Input: srt://45.190.156.152:5000?streamid=#!::r=DISCOVERY_THEATER,m=request latency=2000
+
+029 - DISCOVERY_SCIENCE
+Input: srt://45.190.156.152:5000?streamid=#!::r=DISCOVERY_SCIENCE,m=request latency=2000
+
+030 - UNIVERSAL_REALITY
+Input: srt://45.190.156.152:5000?streamid=#!::r=UNIVERSAL_REALITY,m=request latency=2000
+
+031 - DISCOVERY_TURBO
+Input: srt://45.190.156.152:5000?streamid=#!::r=DISCOVERY_TURBO,m=request latency=2000
+
+032 - DISCOVERY_ID
+Input: srt://45.190.156.152:5000?streamid=#!::r=DISCOVERY_ID,m=request latency=2000
+
+033 - ANIMAL_PLANET
+Input: srt://45.190.156.152:5000?streamid=#!::r=ANIMAL_PLANET,m=request latency=2000
+
+034 - SBT_NEWS
+Input: srt://45.190.156.152:5000?streamid=#!::r=SBT_NEWS,m=request latency=2000
+
+035 - GLOBO_NEWS
+Input: srt://45.190.156.152:5000?streamid=#!::r=GLOBO_NEWS,m=request latency=2000
+
+036 - RECORD_NEWS
+Input: srt://45.190.156.152:5000?streamid=#!::r=RECORD_NEWS,m=request latency=2000
+
+037 - BAND_NEWS
+Input: srt://45.190.156.152:5000?streamid=#!::r=BAND_NEWS,m=request latency=2000
+
+038 - CNN_BRASIL
+Input: srt://45.190.156.152:5000?streamid=#!::r=CNN_BRASIL,m=request latency=2000
+
+039 - CANAL_UOL
+Input: srt://45.190.156.152:5000?streamid=#!::r=CANAL_UOL,m=request latency=2000
+
+040 - JOVEM_PAN_NEWS
+Input: srt://45.190.156.152:5000?streamid=#!::r=JOVEM_PAN_NEWS,m=request latency=2000
+
+041 - HISTORY
+Input: srt://45.190.156.152:5000?streamid=#!::r=HISTORY,m=request latency=2000
+
+042 - HISTORY_2
+Input: srt://45.190.156.152:5000?streamid=#!::r=HISTORY_2,m=request latency=2000
+
+043 - TNT
+Input: srt://45.190.156.152:5000?streamid=#!::r=TNT,m=request latency=2000
+
+044 - TNT_SERIES
+Input: srt://45.190.156.152:5000?streamid=#!::r=TNT_SERIES,m=request latency=2000
+
+045 - TNT_NOVELAS
+Input: srt://45.190.156.152:5000?streamid=#!::r=TNT_NOVELAS,m=request latency=2000
+
+046 - UNIVERSAL_TV
+Input: srt://45.190.156.152:5000?streamid=#!::r=UNIVERSAL_TV,m=request latency=2000
+
+047 - STUDIO_UNIVERSAL
+Input: srt://45.190.156.152:5000?streamid=#!::r=STUDIO_UNIVERSAL,m=request latency=2000
+
+048 - FILM_E_ARTS
+Input: srt://45.190.156.152:5000?streamid=#!::r=FILM_E_ARTS,m=request latency=2000
+
+049 - MEGAPIX
+Input: srt://45.190.156.152:5000?streamid=#!::r=MEGAPIX,m=request latency=2000
+
+050 - CINEMAX
+Input: srt://45.190.156.152:5000?streamid=#!::r=CINEMAX,m=request latency=2000
+
+051 - CANAL_BRASIL
+Input: srt://45.190.156.152:5000?streamid=#!::r=CANAL_BRASIL,m=request latency=2000
+
+052 - SPACE_HD
+Input: srt://45.190.156.152:5000?streamid=#!::r=SPACE_HD,m=request latency=2000
+
+053 - CURTA!
+Input: srt://45.190.156.152:5000?streamid=#!::r=CURTA!,m=request latency=2000
+
+054 - TCM
+Input: srt://45.190.156.152:5000?streamid=#!::r=TCM,m=request latency=2000
+
+055 - TELE_CINE_PREMIUM
+Input: srt://45.190.156.152:5000?streamid=#!::r=TELE_CINE_PREMIUM,m=request latency=2000
+
+056 - TELE_CINE_TOUCH
+Input: srt://45.190.156.152:5000?streamid=#!::r=TELE_CINE_TOUCH,m=request latency=2000
+
+057 - TELE_CINE_PIPOCA
+Input: srt://45.190.156.152:5000?streamid=#!::r=TELE_CINE_PIPOCA,m=request latency=2000
+
+058 - TELE_CINE_ACTION
+Input: srt://45.190.156.152:5000?streamid=#!::r=TELE_CINE_ACTION,m=request latency=2000
+
+059 - TELE_CINE_FUN
+Input: srt://45.190.156.152:5000?streamid=#!::r=TELE_CINE_FUN,m=request latency=2000
+
+060 - TELE_CINE_CULT
+Input: srt://45.190.156.152:5000?streamid=#!::r=TELE_CINE_CULT,m=request latency=2000
+
+061 - HBO
+Input: srt://45.190.156.152:5000?streamid=#!::r=HBO,m=request latency=2000
+
+062 - HBO_2
+Input: srt://45.190.156.152:5000?streamid=#!::r=HBO_2,m=request latency=2000
+
+063 - HBO_PLUS
+Input: srt://45.190.156.152:5000?streamid=#!::r=HBO_PLUS,m=request latency=2000
+
+064 - HBO_FAMILY
+Input: srt://45.190.156.152:5000?streamid=#!::r=HBO_FAMILY,m=request latency=2000
+
+065 - HBO_SIGNATURE
+Input: srt://45.190.156.152:5000?streamid=#!::r=HBO_SIGNATURE,m=request latency=2000
+
+066 - HBO_XTREME
+Input: srt://45.190.156.152:5000?streamid=#!::r=HBO_XTREME,m=request latency=2000
+
+067 - HBO_POP
+Input: srt://45.190.156.152:5000?streamid=#!::r=HBO_POP,m=request latency=2000
+
+068 - HBO_MUNDI
+Input: srt://45.190.156.152:5000?streamid=#!::r=HBO_MUNDI,m=request latency=2000
+
+069 - LIFE_TIME
+Input: srt://45.190.156.152:5000?streamid=#!::r=LIFE_TIME,m=request latency=2000
+
+070 - AXN
+Input: srt://45.190.156.152:5000?streamid=#!::r=AXN,m=request latency=2000
+
+071 - SONY_CHANNEL
+Input: srt://45.190.156.152:5000?streamid=#!::r=SONY_CHANNEL,m=request latency=2000
+
+072 - WARNER_CHANNEL
+Input: srt://45.190.156.152:5000?streamid=#!::r=WARNER_CHANNEL,m=request latency=2000
+
+073 - COMBATE
+Input: srt://45.190.156.152:5000?streamid=#!::r=COMBATE,m=request latency=2000
+
+074 - BAND_SPORTS
+Input: srt://45.190.156.152:5000?streamid=#!::r=BAND_SPORTS,m=request latency=2000
+
+075 - FISH_TV
+Input: srt://45.190.156.152:5000?streamid=#!::r=FISH_TV,m=request latency=2000
+
+076 - SPORTV
+Input: srt://45.190.156.152:5000?streamid=#!::r=SPORTV,m=request latency=2000
+
+077 - SPORTV_2
+Input: srt://45.190.156.152:5000?streamid=#!::r=SPORTV_2,m=request latency=2000
+
+078 - SPORTV_3
+Input: srt://45.190.156.152:5000?streamid=#!::r=SPORTV_3,m=request latency=2000
+
+079 - ESPN
+Input: srt://45.190.156.152:5000?streamid=#!::r=ESPN,m=request latency=2000
+
+080 - ESPN_2
+Input: srt://45.190.156.152:5000?streamid=#!::r=ESPN_2,m=request latency=2000
+
+081 - ESPN_3
+Input: srt://45.190.156.152:5000?streamid=#!::r=ESPN_3,m=request latency=2000
+
+082 - ESPN_4
+Input: srt://45.190.156.152:5000?streamid=#!::r=ESPN_4,m=request latency=2000
+
+083 - ESPN_EXTRA
+Input: srt://45.190.156.152:5000?streamid=#!::r=ESPN_EXTRA,m=request latency=2000
+
+084 - ESPN_6
+Input: srt://45.190.156.152:5000?streamid=#!::r=ESPN_6,m=request latency=2000
+
+085 - PARAMOUNT
+Input: srt://45.190.156.152:5000?streamid=#!::r=PARAMOUNT,m=request latency=2000
+
+086 - PARAMOUNT_2
+Input: srt://45.190.156.152:5000?streamid=#!::r=PARAMOUNT_2,m=request latency=2000
+
+087 - PARAMOUNT_3
+Input: srt://45.190.156.152:5000?streamid=#!::r=PARAMOUNT_3,m=request latency=2000
+
+088 - PREMIERE_CLUBES
+Input: srt://45.190.156.152:5000?streamid=#!::r=PREMIERE_CLUBES,m=request latency=2000
+
+089 - PREMIERE_2
+Input: srt://45.190.156.152:5000?streamid=#!::r=PREMIERE_2,m=request latency=2000
+
+090 - PREMIERE_3
+Input: srt://45.190.156.152:5000?streamid=#!::r=PREMIERE_3,m=request latency=2000
+
+091 - PREMIERE_4
+Input: srt://45.190.156.152:5000?streamid=#!::r=PREMIERE_4,m=request latency=2000
+
+092 - PREMIERE_5
+Input: srt://45.190.156.152:5000?streamid=#!::r=PREMIERE_5,m=request latency=2000
+
+093 - PREMIERE_6
+Input: srt://45.190.156.152:5000?streamid=#!::r=PREMIERE_6,m=request latency=2000
+
+094 - PREMIERE_7
+Input: srt://45.190.156.152:5000?streamid=#!::r=PREMIERE_7,m=request latency=2000
+
+095 - OFF
+Input: srt://45.190.156.152:5000?streamid=#!::r=OFF,m=request latency=2000
+
+096 - HGTV
+Input: srt://45.190.156.152:5000?streamid=#!::r=HGTV,m=request latency=2000
+
+097 - USA
+Input: srt://45.190.156.152:5000?streamid=#!::r=USA,m=request latency=2000
+
+098 - AMC
+Input: srt://45.190.156.152:5000?streamid=#!::r=AMC,m=request latency=2000
+
+099 - EURO_CHANNEL
+Input: srt://45.190.156.152:5000?streamid=#!::r=EURO_CHANNEL,m=request latency=2000
+
+100 - UNIVERSAL_PREMIERE
+Input: srt://45.190.156.152:5000?streamid=#!::r=UNIVERSAL_PREMIERE,m=request latency=2000
+
+101 - WOOHOO
+Input: srt://45.190.156.152:5000?streamid=#!::r=WOOHOO,m=request latency=2000
+
+102 - TLC
+Input: srt://45.190.156.152:5000?streamid=#!::r=TLC,m=request latency=2000
+
+103 - E
+Input: srt://45.190.156.152:5000?streamid=#!::r=E,m=request latency=2000
+
+104 - TV_CULTURA
+Input: srt://45.190.156.152:5000?streamid=#!::r=TV_CULTURA,m=request latency=2000
+
+105 - SBT
+Input: srt://45.190.156.152:5000?streamid=#!::r=SBT,m=request latency=2000
+
+106 - GLOBO_HD
+Input: srt://45.190.156.152:5000?streamid=#!::r=GLOBO_HD,m=request latency=2000
+
+107 - RECORD
+Input: srt://45.190.156.152:5000?streamid=#!::r=RECORD,m=request latency=2000
+
+108 - REDE_TV
+Input: srt://45.190.156.152:5000?streamid=#!::r=REDE_TV,m=request latency=2000
+
+109 - GAZETA
+Input: srt://45.190.156.152:5000?streamid=#!::r=GAZETA,m=request latency=2000
+
+110 - BAND
+Input: srt://45.190.156.152:5000?streamid=#!::r=BAND,m=request latency=2000
+
+111 - MTV_POP
+Input: srt://45.190.156.152:5000?streamid=#!::r=MTV_POP,m=request latency=2000
+
+112 - COMEDY_CENTRAL
+Input: srt://45.190.156.152:5000?streamid=#!::r=COMEDY_CENTRAL,m=request latency=2000
+
+113 - MTV
+Input: srt://45.190.156.152:5000?streamid=#!::r=MTV,m=request latency=2000
+
+114 - FAZENDA1
+Input: srt://45.190.156.152:5000?streamid=#!::r=FAZENDA01,m=request latency=2000
+
+115 - FAZENDA2
+Input: srt://45.190.156.152:5000?streamid=#!::r=FAZENDA02,m=request latency=2000
+
+116 - FAZENDA3
+Input: srt://45.190.156.152:5000?streamid=#!::r=FAZENDA03,m=request latency=2000

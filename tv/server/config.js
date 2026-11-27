@@ -98,9 +98,22 @@ module.exports = {
     segmentosNaLista: Number(process.env.TV_AO_VIVO_LISTA) || 6,
     // Sem nada chegar da origem por este tempo, o ffmpeg desiste e a gente reconecta.
     timeoutMs: Number(process.env.TV_AO_VIVO_TIMEOUT_MS) || 15_000,
-    // Teto de canais convertendo ao mesmo tempo. Cada um é um processo e um fluxo de rede;
-    // o remux custa pouco, mas não é de graça. Suba este número depois de medir no servidor.
+    // Teto de canais convertendo AO MESMO TEMPO. Cada um é um processo e um fluxo de rede;
+    // o remux custa pouco (~2% de um núcleo), mas a memória não: ~60 MB por canal.
     maxCanais: Number(process.env.TV_AO_VIVO_MAX) || 60,
+    // Converter só o canal que alguém está assistindo.
+    //
+    // Com 116 canais no contrato, deixar todos ligados o tempo todo seriam ~7 GB de memória e
+    // centenas de Mbps ENTRANDO 24 horas por dia, mesmo de madrugada, sem ninguém assistindo.
+    // Sob demanda, o servidor converte os que estão sendo vistos agora — que são poucos — e
+    // desliga o resto. Quem abre um canal frio espera alguns segundos; quem volta num canal
+    // ainda morno entra na hora.
+    sobDemanda: process.env.TV_AO_VIVO_SOB_DEMANDA !== '0',
+    // Quanto tempo um canal continua convertendo depois que a última tela fechou. Serve para
+    // zapear: voltar ao canal anterior dentro desse tempo é instantâneo.
+    ociosoSegundos: Number(process.env.TV_AO_VIVO_OCIOSO_S) || 300,
+    // Quanto o assinante espera, ao abrir um canal frio, antes de a plataforma desistir.
+    esperaPrimeiroPedacoMs: Number(process.env.TV_AO_VIVO_ESPERA_MS) || 12_000,
   },
   // Canais marcados para tocar direto na origem (sem transmissão) precisam que o domínio da emissora
   // seja liberado na política de segurança das páginas. Lista separada por vírgula, ex.: 'cdn.emissora.com.br'.

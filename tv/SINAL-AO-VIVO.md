@@ -70,6 +70,77 @@ do canal. 3 Mbps × 300 assinantes = 900 Mbps de upload.
 
 ---
 
+## Conversão sob demanda (é o que faz 116 canais caberem)
+
+O servidor **não** converte os 116 canais o tempo todo. Converte **só os que alguém está
+assistindo naquele momento**, e desliga cada um depois de 5 minutos sem ninguém.
+
+Por que isso não é detalhe:
+
+| | Todos ligados 24 h | Sob demanda |
+|---|---|---|
+| Memória | 116 × 57 MB = **6,6 GB** | ~40 canais vistos ao mesmo tempo = **2,3 GB** |
+| Processador | ~2 núcleos | ~0,7 núcleo |
+| Banda **entrando** | ~350 Mbps, dia e noite | só a dos canais em uso |
+| Banda entrando por dia | **~3,7 TB**, mesmo de madrugada | uma fração disso |
+
+Como fica para o assinante:
+
+- canal **frio** (ninguém via): entra no ar em ~5 s — o app mostra que está entrando no ar;
+- canal **morno** (alguém viu nos últimos 5 minutos): entra **na hora**;
+- zapear entre canais que a casa costuma ver é instantâneo, porque eles ficam mornos.
+
+Para desligar esse comportamento e deixar tudo sempre ligado, `TV_AO_VIVO_SOB_DEMANDA=0` — mas
+só com a memória e a banda da tabela acima sobrando.
+
+---
+
+## Importar a lista do fornecedor de uma vez
+
+A lista chega num texto assim:
+
+```
+001 - TV_APARECIDA
+Input: srt://45.190.156.152:5000?streamid=#!::r=TV_APARECIDA,m=request latency=2000
+```
+
+Salve esse texto num arquivo e rode **no servidor**:
+
+```bash
+cd /opt/playtechvip
+node scripts/importar-canais.js scripts/canais-fornecedor.txt            # só mostra o que faria
+node scripts/importar-canais.js scripts/canais-fornecedor.txt --gravar   # cria os canais
+```
+
+Sem `--gravar` ele não toca no banco: lê, confere todos os endereços, mostra quantos canais há
+em cada categoria e o que corrigiu. Os canais entram **desligados** — teste antes de ligar.
+
+Ele já faz:
+
+- **número e nome** como na lista (`TV_APARECIDA` vira `TV Aparecida`, `TELE_CINE_FUN` vira
+  `Telecine Fun`);
+- **categoria** pelo nome (infantil, esportes, filmes, notícias, documentários…);
+- **classificação indicativa** nos canais adultos, que já nascem fora do perfil infantil;
+- **conserto do endereço** (abaixo).
+
+### O que ele conserta no endereço, e por quê
+
+O endereço que o fornecedor manda vem com dois erros que quebram o canal:
+
+```
+veio: srt://45.190.156.152:5000?streamid=#!::r=GLOBO_HD,m=request latency=2000
+vai : srt://45.190.156.152:5000?streamid=#!::r=GLOBO_HD,m=request&latency=2000000
+```
+
+1. **O espaço antes de `latency`.** Sem o `&`, o ` latency=2000` entra junto no `streamid`, a
+   origem não reconhece o nome do canal e recusa a conexão. O erro apareceria como "a origem não
+   respondeu", e ninguém adivinharia a causa.
+2. **`latency=2000` em milissegundos.** O SRT conta em milissegundos (2000 = 2 s); o ffmpeg conta
+   em **microssegundos**. Ao pé da letra, `latency=2000` são 2 ms de buffer — o canal picotaria a
+   cada oscilação da rede. Vira `2000000`, que é os 2 s que o fornecedor quis dizer.
+
+---
+
 ## Passo a passo no painel
 
 1. **Operação → Canais → Novo canal**

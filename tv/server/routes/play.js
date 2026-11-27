@@ -48,7 +48,7 @@ module.exports = (db, autenticado, comPerfil) => {
     .map((l) => ({ id: l.id, idioma: l.idioma, rotulo: l.rotulo, padrao: Boolean(l.padrao), url: `${baseApi()}/play/legenda/${l.midia_id}?t=${encodeURIComponent(token)}` }));
 
   /** Abre uma tela: confere assinatura, classificação, plano e limite de telas simultâneas. */
-  r.post('/abrir', autenticado, comPerfil, (req, res) => {
+  r.post('/abrir', autenticado, comPerfil, async (req, res) => {
     const acesso = assinaturas.exigirAcesso(db, req.usuario);
     const perfil = req.perfilView;
     const d = req.body;
@@ -61,10 +61,14 @@ module.exports = (db, autenticado, comPerfil) => {
       if (canal.fonte === 'embed' ? !canal.url_embed : !canal.url_hls) {
         throw new ErroNegocio('Este canal ainda não tem sinal cadastrado. Fale com o atendimento.', 409, { motivo: 'sem_sinal' });
       }
-      // RTMP/SRT: a conversão leva alguns segundos para escrever o primeiro pedaço. Abrir a tela
-      // antes disso daria tela preta; é melhor dizer que está entrando no ar.
-      if (canal.fonte === 'rtmp' && !aovivo.temSinal(canal.id)) {
-        throw new ErroNegocio('Este canal está entrando no ar. Tente de novo em alguns segundos.', 503, { motivo: 'aquecendo' });
+      // RTMP/SRT: é aqui que o canal entra no ar. A conversão só roda para canal que alguém
+      // está assistindo, então abrir a tela é o que liga o sinal — e esperamos o primeiro
+      // pedaço antes de responder, para o player não receber uma lista vazia.
+      if (canal.fonte === 'rtmp' && !await aovivo.garantir(canal, db)) {
+        const sit = aovivo.situacao(canal.id);
+        throw new ErroNegocio(sit.erro
+          ? 'Este canal está fora do ar no momento. A operação já foi avisada.'
+          : 'Este canal está entrando no ar. Tente de novo em alguns segundos.', 503, { motivo: 'aquecendo' });
       }
       const { sessao, token } = player.abrirSessao(db, { usuario: req.usuario, perfil, acesso, tipo, canal, dispositivo, ip: req.ip });
       const noAr = epg.noAr(db, canal.id);
@@ -188,6 +192,8 @@ module.exports = (db, autenticado, comPerfil) => {
       // Canal em RTMP/SRT: a lista é a que o nosso ffmpeg está escrevendo em disco. Não há origem
       // para buscar, e cada pedaço aponta para a rota que serve o arquivo local.
       if (canal.fonte === 'rtmp') {
+        // Cada pedido de lista (o player repete a cada poucos segundos) segura o canal vivo.
+        aovivo.marcarUso(canal.id);
         return res.set({
           'Content-Type': 'application/vnd.apple.mpegurl',
           'Cache-Control': 'no-store',

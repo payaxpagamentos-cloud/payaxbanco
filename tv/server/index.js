@@ -30,10 +30,10 @@ cada(30_000, 'sessões do player', () => encerrarSessoesMortas(db));
 cada(60 * 60_000, 'cobrança', () => rodarCobranca(db));
 // Sinal dos canais: o painel mostra quem está fora do ar.
 cada(15 * 60_000, 'verificação de sinal', () => { verificarSinais(db).catch(() => {}); });
-// Conversão dos canais em RTMP/SRT: confere de minuto em minuto se o que está convertendo é o
-// que o banco manda. A operação ligar um canal já sincroniza na hora; isto é a rede de segurança
-// para um processo que morreu de um jeito que não deu para reconectar.
-cada(60_000, 'canais ao vivo', () => aovivo.sincronizar(db));
+// Conversão dos canais em RTMP/SRT. Sob demanda, o canal entra no ar quando o assinante abre;
+// esta volta de 30 em 30 segundos é quem desliga o que ninguém está mais assistindo e quem
+// derruba a conversão de um canal que a operação tirou do ar.
+cada(30_000, 'canais ao vivo', () => aovivo.sincronizar(db));
 // Grade dos canais abertos: busca o XMLTV cadastrado e limpa o que já passou.
 const cuidarDaGrade = () => {
   const removidos = limparAntigos(db, 7);
@@ -47,10 +47,11 @@ cada(24 * 60 * 60_000, 'atualização da grade', cuidarDaGrade);
 setTimeout(() => {
   try { rodarCobranca(db); } catch (err) { console.error(`[${config.marca}] Falha na cobrança:`, err.message); }
   verificarSinais(db).catch(() => {});
-  // Canais em RTMP/SRT voltam ao ar sozinhos depois de um reinício.
+  // Canais em RTMP/SRT. Sob demanda, nenhum sobe agora: cada um entra no ar quando alguém abrir.
   try {
-    const { ligados, limitados } = aovivo.sincronizar(db);
-    if (ligados) console.log(`[${config.marca}] Ao vivo: ${ligados} canal(is) convertendo para HLS.`);
+    const { ligados, limitados, sob_demanda: sobDemanda } = aovivo.sincronizar(db);
+    if (sobDemanda) console.log(`[${config.marca}] Ao vivo: conversão sob demanda (canal entra no ar ao ser assistido, sai após ${config.aoVivo.ociosoSegundos}s ocioso).`);
+    else if (ligados) console.log(`[${config.marca}] Ao vivo: ${ligados} canal(is) convertendo para HLS.`);
     if (limitados) console.warn(`[${config.marca}] Ao vivo: ${limitados} canal(is) além do teto de ${config.aoVivo.maxCanais}.`);
   } catch (err) { console.error(`[${config.marca}] Falha ao ligar os canais ao vivo:`, err.message); }
   // Conversões que ficaram pela metade num reinício voltam para a fila.

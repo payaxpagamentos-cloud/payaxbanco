@@ -16,7 +16,18 @@ process.env.TV_AO_VIVO_PASTA = fs.mkdtempSync(path.join(os.tmpdir(), 'play-tech-
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { iniciar } = require('./helpers');
+const config = require('../server/config');
 const aovivo = require('../server/lib/aovivo');
+
+/** Espera a pasta do canal sumir: a limpeza só acontece depois que o ffmpeg morre de verdade. */
+async function esperarLimpeza(canalId, limiteMs = 4000) {
+  const fim = Date.now() + limiteMs;
+  while (Date.now() < fim) {
+    if (!fs.existsSync(aovivo.pastaDoCanal(canalId))) return true;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  return false;
+}
 
 /** Espera a conversão escrever o primeiro pedaço (o de verdade também leva alguns segundos). */
 async function esperarSinal(canalId, limiteMs = 3000) {
@@ -45,6 +56,47 @@ test('nome de pedaço fora do formato não vira caminho no disco', () => {
   }
 });
 
+test('conversão é sob demanda: canal cadastrado não gasta nada até alguém assistir', async (t) => {
+  const s = await iniciar();
+  t.after(() => { aovivo.desligarTudo(); return s.fechar(); });
+  const admin = await s.adminLogin();
+
+  const canal = (await s.post('/admin/canais', {
+    numero: 50, nome: 'PLAY Sob Demanda', fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/demanda',
+  }, admin)).dados.canal;
+
+  // 116 canais ligados o tempo todo não cabem em servidor nenhum: cadastrar não liga nada.
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(aovivo.situacao(canal.id).convertendo, false, 'cadastrar um canal não pode ligar a conversão');
+
+  // Quem liga é o assinante que abre o canal — e a resposta já vem com o sinal no ar.
+  const cliente = await s.assinante('demanda@exemplo.com.br', { plano: 2 });
+  const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil);
+  assert.equal(abrir.status, 201, JSON.stringify(abrir.dados));
+  assert.equal(aovivo.situacao(canal.id).convertendo, true);
+  assert.equal(aovivo.temSinal(canal.id), true, 'a tela só abre depois do primeiro pedaço');
+
+  // Canal que acabou de ser visto não pode ser desligado no meio do filme de ninguém.
+  aovivo.marcarUso(canal.id);
+  assert.equal(aovivo.limparOciosos(), 0);
+
+  // Sem ninguém assistindo há tempo demais, sai do ar e devolve a memória e a banda.
+  const folga = config.aoVivo.ociosoSegundos;
+  config.aoVivo.ociosoSegundos = 0;
+  await new Promise((r) => setTimeout(r, 20));   // o corte é por relógio: precisa passar do instante do último uso
+  try {
+    assert.equal(aovivo.limparOciosos(), 1, 'canal ocioso tem de sair do ar');
+  } finally {
+    config.aoVivo.ociosoSegundos = folga;
+  }
+  assert.equal(aovivo.situacao(canal.id).convertendo, false);
+  assert.ok(await esperarLimpeza(canal.id), 'o disco do canal ocioso é liberado');
+
+  // E voltar ao canal o põe no ar de novo, sem a operação fazer nada.
+  const devolta = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil);
+  assert.equal(devolta.status, 201, JSON.stringify(devolta.dados));
+});
+
 test('canal em RTMP: cadastro, conversão no ar e sinal entregue ao assinante', async (t) => {
   const s = await iniciar();
   t.after(() => { aovivo.desligarTudo(); return s.fechar(); });
@@ -63,6 +115,10 @@ test('canal em RTMP: cadastro, conversão no ar e sinal entregue ao assinante', 
   const canal = criado.dados.canal;
   assert.equal(canal.fonte, 'rtmp');
 
+  // Sob demanda, quem põe o canal no ar é o assinante que o abre.
+  const cliente = await s.assinante('aovivo@exemplo.com.br', { plano: 2 });
+  const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id, dispositivo: 'Smart TV' }, cliente.token, cliente.comPerfil);
+  assert.equal(abrir.status, 201, JSON.stringify(abrir.dados));
   assert.ok(await esperarSinal(canal.id), 'a conversão deveria ter escrito a lista');
 
   // O painel mostra a situação da conversão sem precisar perguntar a ninguém. O "ok" só aparece
@@ -78,10 +134,7 @@ test('canal em RTMP: cadastro, conversão no ar e sinal entregue ao assinante', 
   assert.equal(noPainel.sinal_status, 'ok');
   assert.match(noPainel.sinal_detalhe, /convertendo para HLS/);
 
-  // Assinante abre o canal: o endereço da origem nunca aparece, só o nosso.
-  const cliente = await s.assinante('aovivo@exemplo.com.br', { plano: 2 });
-  const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id, dispositivo: 'Smart TV' }, cliente.token, cliente.comPerfil);
-  assert.equal(abrir.status, 201);
+  // O endereço da origem nunca aparece para o assinante, só o nosso.
   assert.equal(abrir.dados.fonte.tipo, 'hls');
   assert.equal(abrir.dados.fonte.nossos_servidores, true);
   assert.doesNotMatch(abrir.dados.fonte.url, /rtmp|origem\.interna/, 'a origem não pode vazar para o player');
@@ -112,7 +165,7 @@ test('canal em RTMP: cadastro, conversão no ar e sinal entregue ao assinante', 
   const desligado = await s.patch(`/admin/canais/${canal.id}`, { ativo: false }, admin);
   assert.equal(desligado.status, 200);
   assert.equal(aovivo.situacao(canal.id).convertendo, false);
-  assert.equal(fs.existsSync(aovivo.pastaDoCanal(canal.id)), false, 'os pedaços do canal desligado saem do disco');
+  assert.ok(await esperarLimpeza(canal.id), 'os pedaços do canal desligado saem do disco');
 });
 
 test('testar o sinal de um canal no ar lê a conversão, não a origem', async (t) => {
@@ -123,6 +176,8 @@ test('testar o sinal de um canal no ar lê a conversão, não a origem', async (
   const canal = (await s.post('/admin/canais', {
     numero: 33, nome: 'PLAY Conferência', fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/conferencia',
   }, admin)).dados.canal;
+  const cliente = await s.assinante('confere@exemplo.com.br', { plano: 2 });
+  await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil);
   assert.ok(await esperarSinal(canal.id));
 
   // Muito fornecedor aceita só uma conexão por sinal: conferir pela origem derrubaria o canal.
@@ -142,23 +197,30 @@ test('origem fora do ar: a conversão tenta de novo e o painel conta o que houve
   assert.equal(criado.status, 201);
   const id = criado.dados.canal.id;
 
-  // O ffmpeg de mentira sai com erro para este endereço; o servidor anota e agenda a volta.
-  const fim = Date.now() + 3000;
-  let sit = aovivo.situacao(id);
-  while (Date.now() < fim && !sit.erro) {
-    await new Promise((r) => setTimeout(r, 25));
-    sit = aovivo.situacao(id);
-  }
+  // O assinante não vê tela preta: a tela nem abre, e vem um recado no lugar.
+  const cliente = await s.assinante('falha@exemplo.com.br', { plano: 2 });
+  const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: id }, cliente.token, cliente.comPerfil);
+  assert.equal(abrir.status, 503, JSON.stringify(abrir.dados));
+  assert.equal(abrir.dados.detalhes?.motivo ?? abrir.dados.motivo, 'aquecendo');
+
+  // E a operação vê o motivo, com as tentativas de reconexão.
+  const sit = aovivo.situacao(id);
   assert.match(sit.erro ?? '', /404|parou/, 'o erro da origem precisa chegar ao painel');
   assert.ok(sit.tentativas >= 1);
   assert.ok(sit.proxima_tentativa, 'tem de haver uma próxima tentativa marcada');
 
   const noPainel = (await s.get('/admin/canais', admin)).dados.canais.find((c) => c.id === id);
   assert.equal(noPainel.sinal_status, 'falha');
+});
 
-  // Assinante não vê tela preta: recebe o recado de que o canal está entrando no ar.
-  const cliente = await s.assinante('falha@exemplo.com.br', { plano: 2 });
-  const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: id }, cliente.token, cliente.comPerfil);
-  assert.equal(abrir.status, 503);
-  assert.equal(abrir.dados.detalhes?.motivo ?? abrir.dados.motivo, 'aquecendo');
+test('endereço SRT do fornecedor: o streamid chega inteiro e o latency vira microssegundos', () => {
+  // É assim que a lista do fornecedor chega. Dois erros vêm junto, e os dois quebram o canal:
+  // o espaço antes de "latency" (que entraria no streamid) e o latency em milissegundos.
+  const veio = 'srt://45.190.156.152:5000?streamid=#!::r=GLOBO_HD,m=request latency=2000';
+  const vai = aovivo.conferirEndereco(veio);
+  assert.equal(vai, 'srt://45.190.156.152:5000?streamid=#!::r=GLOBO_HD,m=request&latency=2000000');
+  // O "#" não pode virar fragmento: com new URL() o streamid ficaria vazio e o canal não conectaria.
+  assert.match(vai, /streamid=#!::r=GLOBO_HD,m=request(&|$)/);
+  // latency já em microssegundos passa intacto.
+  assert.match(aovivo.conferirEndereco('srt://1.2.3.4:5000?latency=2000000'), /latency=2000000$/);
 });

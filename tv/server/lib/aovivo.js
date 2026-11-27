@@ -38,15 +38,50 @@ const vivos = new Map();
 /** Espera entre reconexões: 2s, 4s, 8s… até 60s. */
 const esperaDaTentativa = (n) => Math.min(2000 * (2 ** Math.max(0, n - 1)), 60_000);
 
-/** O endereço é de um sinal ao vivo que o ffmpeg sabe puxar? (Endereço interno é permitido: a
- * origem costuma ficar na rede do próprio provedor, e quem cadastra aqui é a operação.) */
+/**
+ * Confere e acerta o endereço de um sinal ao vivo.
+ *
+ * NÃO usa `new URL()` de propósito. O endereço SRT de um fornecedor é assim:
+ *
+ *   srt://1.2.3.4:5000?streamid=#!::r=GLOBO_HD,m=request latency=2000
+ *
+ * e o `new URL()` joga tudo a partir do `#` para o fragmento, deixando `streamid=` vazio: o
+ * canal nunca conectaria, e o erro apareceria lá na frente, como "a origem não respondeu".
+ * Então aqui o endereço é conferido por partes e o que vem depois do `?` passa inteiro.
+ *
+ * Duas correções entram de graça, porque é onde a lista do fornecedor sempre vem errada:
+ *
+ *  - **espaço no lugar de `&`**: parâmetro separado por espaço vira parte do streamid, e o
+ *    servidor da origem recusa a conexão por streamid desconhecido;
+ *  - **latency em milissegundos**: o SRT conta em ms (2000 = 2 s), o ffmpeg conta em
+ *    microssegundos. `latency=2000` ao pé da letra é 2 ms — buffer nenhum, e o canal pica a
+ *    cada oscilação da rede. Valor que claramente está em ms é convertido.
+ *
+ * Endereço de rede interna é aceito: a origem costuma ficar na rede do próprio provedor, e
+ * quem cadastra aqui é a operação, não o assinante.
+ */
 function conferirEndereco(valor) {
-  let u;
-  try { u = new URL(String(valor)); } catch { throw new ErroNegocio('Endereço do sinal ao vivo inválido.', 422); }
-  if (!PROTOCOLOS.includes(u.protocol)) {
-    throw new ErroNegocio(`Endereço do sinal ao vivo deve começar com ${PROTOCOLOS.map((p) => `${p}//`).join(', ')}.`, 422);
+  const bruto = String(valor ?? '').trim();
+  const partes = /^([a-z][a-z0-9+.-]*:)\/\/([^/?\s]+)(\/[^?\s]*)?(?:\?([\s\S]*))?$/i.exec(bruto);
+  if (!partes) throw new ErroNegocio('Endereço do sinal ao vivo inválido.', 422);
+  const [, protocolo, autoridade, caminho = '', consulta] = partes;
+  if (!PROTOCOLOS.includes(protocolo.toLowerCase())) {
+    throw new ErroNegocio(`Endereço do sinal ao vivo deve começar com ${PROTOCOLOS.map((x) => `${x}//`).join(', ')}.`, 422);
   }
-  return u.toString();
+  if (autoridade.includes('@')) throw new ErroNegocio('Não coloque usuário e senha no endereço do sinal.', 422);
+  if (!/^[\w.-]+(:\d{1,5})?$|^\[[0-9a-f:]+\](:\d{1,5})?$/i.test(autoridade)) {
+    throw new ErroNegocio('Endereço do sinal ao vivo inválido (confira o servidor e a porta).', 422);
+  }
+  if (!consulta) return `${protocolo}//${autoridade}${caminho}`;
+
+  // Espaço entre parâmetros é erro de digitação em toda lista que chega: vira '&'.
+  let q = consulta.trim().replace(/\s+(?=[A-Za-z_][\w.-]*=)/g, '&').replace(/\s+/g, '');
+  q = q.replace(/(^|&)latency=(\d+)/gi, (todo, antes, n) => {
+    const valorN = Number(n);
+    // Até 100000 só pode ser milissegundos: 100000 µs seriam 0,1 s, que não é buffer de nada.
+    return valorN > 0 && valorN <= 100_000 ? `${antes}latency=${valorN * 1000}` : todo;
+  });
+  return `${protocolo}//${autoridade}${caminho}?${q}`;
 }
 
 function limparPasta(id) {
@@ -71,10 +106,11 @@ function anotar(db, id, status, detalhe) {
  */
 function ligar(canal, db) {
   const atual = vivos.get(canal.id);
-  if (atual?.processo) return atual;
+  if (atual?.processo) { atual.ultimoUso = Date.now(); return atual; }
 
   const estado = atual ?? { tentativas: 0, erro: null, desde: null, processo: null, parando: false, proxima: null };
   estado.parando = false;
+  estado.ultimoUso = Date.now();
   vivos.set(canal.id, estado);
 
   fs.mkdirSync(pastaDoCanal(canal.id), { recursive: true });
@@ -157,16 +193,36 @@ function ligar(canal, db) {
   return estado;
 }
 
-/** Desliga a conversão e apaga os pedaços do canal. */
+/**
+ * Desliga a conversão e apaga os pedaços do canal.
+ *
+ * A limpeza espera o ffmpeg morrer de verdade. Apagar a pasta logo depois do SIGTERM parece
+ * funcionar e não funciona: o processo ainda está vivo por alguns milissegundos e grava mais um
+ * pedaço na pasta recém-apagada. Quando o canal voltasse ao ar, a lista nova começaria com um
+ * pedaço velho dentro — e o assinante veria alguns segundos do que já passou.
+ */
 function desligar(id) {
   const estado = vivos.get(id);
   if (!estado) return;
   estado.parando = true;
   clearTimeout(estado.relogio);
   clearInterval(estado.confirmacao);
-  try { estado.processo?.kill('SIGTERM'); } catch { /* já morreu */ }
   vivos.delete(id);
-  limparPasta(id);
+  const processo = estado.processo;
+  if (!processo) return limparPasta(id);
+
+  let limpou = false;
+  const limpar = () => { if (!limpou) { limpou = true; limparPasta(id); } };
+  processo.once('exit', limpar);
+  try { processo.kill('SIGTERM'); } catch { limpar(); }
+  // Processo que não atende ao pedido educado leva SIGKILL; a pasta sai de um jeito ou de outro.
+  const prazo = setTimeout(() => {
+    try { processo.kill('SIGKILL'); } catch { /* já morreu */ }
+    limpar();
+  }, 3000);
+  if (prazo.unref) prazo.unref();
+  processo.once('exit', () => clearTimeout(prazo));
+  return undefined;
 }
 
 /** Desliga tudo (parada do servidor). */
@@ -177,19 +233,74 @@ const desligarTudo = () => { for (const id of [...vivos.keys()]) desligar(id); }
  * Chamado ao subir e sempre que a operação mexe nos canais.
  */
 function sincronizar(db) {
-  if (!config.aoVivo.ligado) return { ligados: 0, limitados: 0 };
+  if (!config.aoVivo.ligado) { desligarTudo(); return { ligados: 0, limitados: 0 }; }
   let canais;
   try {
     canais = db.prepare("SELECT id, nome, url_hls FROM canais WHERE fonte = 'rtmp' AND ativo = 1 AND url_hls IS NOT NULL AND url_hls <> '' ORDER BY ordem, numero").all();
   } catch { return { ligados: 0, limitados: 0 }; }
+  const podem = new Set(canais.map((c) => c.id));
+  // Canal desligado, apagado ou que deixou de ser RTMP para de converter na hora.
+  for (const id of [...vivos.keys()]) if (!podem.has(id)) desligar(id);
+
+  if (config.aoVivo.sobDemanda) {
+    // Sob demanda, quem liga o canal é o assinante que o abre (garantir). Aqui só se faz a
+    // limpeza: ficar de pé convertendo 116 canais que ninguém está vendo não cabe em servidor
+    // nenhum, e seria banda entrando de graça o dia inteiro.
+    limparOciosos();
+    return { ligados: vivos.size, limitados: 0, sob_demanda: true };
+  }
   const dentroDoTeto = canais.slice(0, config.aoVivo.maxCanais);
-  const devem = new Set(dentroDoTeto.map((c) => c.id));
-  for (const id of [...vivos.keys()]) if (!devem.has(id)) desligar(id);
+  for (const id of [...vivos.keys()]) if (!dentroDoTeto.some((c) => c.id === id)) desligar(id);
   for (const c of dentroDoTeto) ligar(c, db);
   for (const c of canais.slice(config.aoVivo.maxCanais)) {
     anotar(db, c.id, 'falha', `Passou do teto de ${config.aoVivo.maxCanais} canais ao vivo convertendo ao mesmo tempo.`);
   }
-  return { ligados: dentroDoTeto.length, limitados: canais.length - dentroDoTeto.length };
+  return { ligados: dentroDoTeto.length, limitados: canais.length - dentroDoTeto.length, sob_demanda: false };
+}
+
+/** O player pediu a lista: o canal continua vivo mais um tempo. */
+function marcarUso(id) {
+  const e = vivos.get(id);
+  if (e) e.ultimoUso = Date.now();
+}
+
+/** Desliga quem ninguém está assistindo há mais do que o tempo de folga. */
+function limparOciosos() {
+  if (!config.aoVivo.sobDemanda) return 0;
+  const corte = Date.now() - config.aoVivo.ociosoSegundos * 1000;
+  let desligados = 0;
+  for (const [id, e] of vivos) {
+    if ((e.ultimoUso ?? 0) < corte) { desligar(id); desligados += 1; }
+  }
+  return desligados;
+}
+
+/**
+ * Garante que um canal está no ar, ligando a conversão se preciso, e espera o primeiro pedaço.
+ * É o que o assinante dispara ao abrir o canal.
+ *
+ * Devolve true quando há sinal. Falso quer dizer que a origem não respondeu a tempo — e aí o
+ * assinante recebe um recado, não uma tela preta.
+ */
+async function garantir(canal, db, { esperarMs = config.aoVivo.esperaPrimeiroPedacoMs } = {}) {
+  if (!config.aoVivo.ligado) return false;
+  if (temSinal(canal.id)) { marcarUso(canal.id); return true; }
+  // Teto de canais simultâneos: antes de subir mais um, tenta abrir espaço no que está ocioso.
+  if (!vivos.has(canal.id) && vivos.size >= config.aoVivo.maxCanais) {
+    limparOciosos();
+    if (vivos.size >= config.aoVivo.maxCanais) {
+      throw new ErroNegocio(`O servidor já está convertendo ${config.aoVivo.maxCanais} canais ao mesmo tempo. Tente em instantes.`, 503, { motivo: 'teto' });
+    }
+  }
+  const estado = ligar(canal, db);
+  const fim = Date.now() + esperarMs;
+  while (Date.now() < fim) {
+    await new Promise((r) => { setTimeout(r, 200); });
+    if (temSinal(canal.id)) { marcarUso(canal.id); return true; }
+    // A origem recusou a conexão: não adianta esperar o resto do prazo.
+    if (!estado.processo && estado.erro) return false;
+  }
+  return false;
 }
 
 /** O pedaço mais recente já escrito pela conversão (para conferir o sinal sem tocar na origem). */
@@ -300,5 +411,6 @@ function situacao(id) {
 
 module.exports = {
   PROTOCOLOS, conferirEndereco, conferir, ligar, desligar, desligarTudo, sincronizar, situacao, temSinal,
+  garantir, marcarUso, limparOciosos,
   listaDoPlayer, caminhoDoPedaco, pastaDoCanal, listaDoCanal,
 };
