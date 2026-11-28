@@ -16,6 +16,7 @@ const player = require('../lib/player');
 const v = require('../lib/validacao');
 const qualidades = require('../lib/qualidades');
 const sistema = require('../lib/sistema');
+const aovivo = require('../lib/aovivo');
 const express = require('express');
 
 const soAdmin = permitir('admin');
@@ -426,6 +427,10 @@ module.exports = (db) => {
       video_max_mb: Math.round(config.videoMaxBytes / 1048576),
       telas_sem_sinal_s: config.sessaoPlayerSegundos,
       midia_dir: config.midiaDir,
+      // Para a tela explicar a escolha dos canais sempre ligados com os números desta máquina.
+      canais_quentes_padrao: config.aoVivo.quentesAutomaticos,
+      canais_quentes: aovivo.resumoDosQuentes(),
+      recursos: aovivo.recursos(),
     },
   }));
 
@@ -441,7 +446,15 @@ module.exports = (db) => {
     if (d.retomar_folga_s !== undefined) valores.retomar_folga_s = v.inteiro(d.retomar_folga_s, 'a folga ao retomar', { min: 0, max: 120 });
     if (d.aviso_home !== undefined) valores.aviso_home = String(d.aviso_home ?? '').slice(0, 300);
     if (d.epg_url !== undefined) valores.epg_url = String(d.epg_url ?? '').trim().slice(0, 1000);
+    if (d.canais_quentes !== undefined) {
+      // '' devolve a decisão ao padrão do servidor; 'todos' liga todos os que couberem; um
+      // número é "os N mais assistidos".
+      const q = String(d.canais_quentes ?? '').trim().toLowerCase();
+      valores.canais_quentes = q === '' || q === 'todos' ? q : String(v.inteiro(q, 'a quantidade de canais sempre ligados', { min: 0, max: 500 }));
+    }
     gravarConfig(db, valores);
+    // A escolha dos canais ligados vale já, sem esperar a rodada de 30 s.
+    if (valores.canais_quentes !== undefined) aovivo.sincronizar(db);
     registrar(db, req, 'config_alterada', Object.keys(valores));
     res.json({ config: lerConfig(db) });
   });

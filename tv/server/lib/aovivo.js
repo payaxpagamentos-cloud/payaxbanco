@@ -1,10 +1,11 @@
 'use strict';
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { spawn, execFile } = require('node:child_process');
 const config = require('../config');
-const { agora } = require('../db');
+const { agora, lerConfig } = require('../db');
 const { ErroNegocio } = require('./erros');
 
 /**
@@ -397,6 +398,7 @@ function desligarTudo({ esperarMs = 5000 } = {}) {
   partidas.clear();
   semAnaliseRapida.clear();
   quentesPorAudiencia = new Set();
+  resumoDosQuentes = { todos: false, canais: 0, alvo: 0, ligados: 0, limite: null };
   if (!processos.length) return Promise.resolve();
   return Promise.race([
     Promise.all(processos.map((p) => (p.exitCode !== null || p.signalCode !== null
@@ -430,8 +432,32 @@ function sincronizar(db) {
     // A exceção são os canais quentes: os mais vistos ficam convertendo sempre, para abrirem na
     // hora em vez de fazer o assinante esperar o canal subir toda vez que ele esfria.
     const quentes = canaisQuentes(canais, db);
-    for (const c of quentes) if (!vivos.has(c.id)) ligar(c, db);
+    let limite = null;
+    let subiram = 0;
+    for (const c of quentes) {
+      if (vivos.has(c.id)) continue;
+      // Aos poucos: a memória medida na próxima rodada já conta os que subiram nesta.
+      if (subiram >= config.aoVivo.quentesPorRodada) { limite = 'subindo aos poucos: mais canais na próxima rodada (30 s)'; break; }
+      const cabe = cabeMaisUm();
+      if (!cabe.cabe) { limite = cabe.motivo; break; }
+      ligar(c, db);
+      subiram += 1;
+    }
+    // A memória apertou de verdade (abaixo de metade da reserva): desliga um canal quente que
+    // ninguém está vendo, o menos assistido deles, por rodada. Antes isso do que o sistema
+    // operacional matar um processo por conta própria — que podia ser o do app.
+    if (recursos().memoriaLivreMB < config.aoVivo.reservaMemoriaMB / 2) {
+      const semUso = Date.now() - config.aoVivo.alivioSemUsoMs;
+      const sacrificado = [...quentes].reverse().find((c) => vivos.has(c.id) && (vivos.get(c.id).ultimoUso ?? 0) < semUso && !new Set(config.aoVivo.quentes).has(c.numero));
+      if (sacrificado) {
+        desligar(sacrificado.id);
+        quentesPorAudiencia.delete(sacrificado.id);
+        limite = `memória no fim: "${sacrificado.nome}" foi desligado para aliviar (volta a abrir sob demanda)`;
+      }
+    }
     limparOciosos();
+    const ligadosQuentes = quentes.filter((c) => vivos.has(c.id)).length;
+    resumoDosQuentes = { ...resumoDosQuentes, alvo: quentes.length, ligados: ligadosQuentes, limite: ligadosQuentes < quentes.length ? limite : null };
     return { ligados: vivos.size, limitados: 0, sob_demanda: true, quentes: quentes.length };
   }
   const dentroDoTeto = canais.slice(0, config.aoVivo.maxCanais);
@@ -461,20 +487,87 @@ function marcarUso(id) {
  * Canal aberto meia dúzia de vezes na semana não entra: manter um canal convertendo o dia
  * inteiro só se paga quando há gente de verdade abrindo.
  */
+/**
+ * O que a máquina tem para dar: memória disponível e quantos núcleos o app pode usar.
+ *
+ * `MemAvailable` (e não a memória "livre") é o número certo: conta o que o sistema devolve na
+ * hora se alguém pedir. Os núcleos vêm do limite do contêiner, não da máquina — o compose
+ * libera 2 dos 4 por padrão (CPUS_APP), e é esse o teto de verdade.
+ */
+function recursos() {
+  if (config.aoVivo.recursosFixos) return config.aoVivo.recursosFixos;   // só os testes usam
+  let memoriaLivreMB = Math.round(os.freemem() / 1048576);
+  try {
+    const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/proc/meminfo', 'utf8'));
+    if (m) memoriaLivreMB = Math.round(Number(m[1]) / 1024);
+  } catch { /* fora do Linux: vale o que o Node informa */ }
+  let nucleos = os.cpus().length || 1;
+  try {
+    const [cota, periodo] = fs.readFileSync('/sys/fs/cgroup/cpu.max', 'utf8').trim().split(/\s+/);
+    if (cota !== 'max' && Number(periodo) > 0) nucleos = Math.min(nucleos, Number(cota) / Number(periodo));
+  } catch { /* sem limite de contêiner */ }
+  return { memoriaLivreMB, nucleos };
+}
+
+// Medido: um canal ligado (remux, sem recodificar) usa ~1,4% de um núcleo. Arredondado para cima.
+const NUCLEO_POR_CANAL = 0.015;
+
+/**
+ * Dá para ligar mais um canal quente? Olha memória e processador, nessa ordem.
+ *
+ * No processador, um núcleo fica reservado para o app em si (é ele quem atende os assinantes),
+ * e do que sobra usa-se até 85%. Com 2 núcleos liberados isso dá uns 56 canais; com 4, uns 170.
+ */
+function cabeMaisUm() {
+  const r = recursos();
+  if (r.memoriaLivreMB < config.aoVivo.reservaMemoriaMB) {
+    return { cabe: false, motivo: `memória: restam ${r.memoriaLivreMB} MB livres, e a reserva é de ${config.aoVivo.reservaMemoriaMB} MB` };
+  }
+  const porProcessador = Math.floor((Math.max(0, r.nucleos - 1) * 0.85) / NUCLEO_POR_CANAL);
+  if (vivos.size >= porProcessador) {
+    const n = Number(r.nucleos.toFixed(1)).toLocaleString('pt-BR');
+    return { cabe: false, motivo: `processador: ${n} núcleo(s) liberado(s) para o app comportam ${porProcessador} canais (CPUS_APP no .env aumenta)` };
+  }
+  return { cabe: true, motivo: null };
+}
+
+/**
+ * Quantos canais devem ficar sempre ligados: o que a operação escolheu no painel
+ * (Configurações), ou o padrão do servidor. Devolve { todos, quantos }.
+ */
+function alvoDeQuentes(db) {
+  let escolha = '';
+  try { escolha = String(lerConfig(db).canais_quentes ?? '').trim().toLowerCase(); } catch { /* sem banco */ }
+  const valor = escolha !== '' ? escolha : config.aoVivo.quentesAutomaticos;
+  if (valor === 'todos') return { todos: true, quantos: Infinity };
+  return { todos: false, quantos: Math.max(0, Number(valor) || 0) };
+}
+
+/** Teto de conversões simultâneas. Com "todos", o teto do .env sobe para caber todos os canais. */
+const tetoDeConversoes = () => (resumoDosQuentes.todos ? Math.max(config.aoVivo.maxCanais, resumoDosQuentes.canais + 5) : config.aoVivo.maxCanais);
+
+// O retrato da última rodada, para o painel: quantos deveriam estar quentes, quantos estão e,
+// se faltou algum, por quê.
+let resumoDosQuentes = { todos: false, canais: 0, alvo: 0, ligados: 0, limite: null };
+
 const MINIMO_DE_ABERTURAS = 5;
 const audienciaGuardada = new WeakMap();   // db -> { em, ids }
-function maisVistos(db, quantos = config.aoVivo.quentesAutomaticos, { refazer = false } = {}) {
-  if (!db || quantos <= 0) return [];
-  const tem = audienciaGuardada.get(db);
-  if (!refazer && tem && Date.now() - tem.em < 30 * 60_000) return tem.ids.slice(0, quantos);
-  let ids = [];
-  try {
-    ids = db.prepare(`SELECT canal_id, COUNT(*) AS n FROM sessoes_player
-      WHERE canal_id IS NOT NULL AND iniciada_em >= ? GROUP BY canal_id HAVING n >= ? ORDER BY n DESC, canal_id LIMIT 60`)
-      .all(new Date(Date.now() - 7 * 86_400_000).toISOString(), MINIMO_DE_ABERTURAS).map((x) => x.canal_id);
-  } catch { /* banco fechando ou ainda sem a tabela: sem audiência, sem canal quente */ }
-  audienciaGuardada.set(db, { em: Date.now(), ids });
-  return ids.slice(0, quantos);
+function maisVistos(db, quantos = alvoDeQuentes(db).quantos, { refazer = false, semMinimo = false } = {}) {
+  if (!db || !(quantos > 0)) return [];
+  let tem = audienciaGuardada.get(db);
+  if (refazer || !tem || Date.now() - tem.em >= 30 * 60_000) {
+    let linhas = [];
+    try {
+      linhas = db.prepare(`SELECT canal_id, COUNT(*) AS n FROM sessoes_player
+        WHERE canal_id IS NOT NULL AND iniciada_em >= ? GROUP BY canal_id ORDER BY n DESC, canal_id LIMIT 500`)
+        .all(new Date(Date.now() - 7 * 86_400_000).toISOString());
+    } catch { /* banco fechando ou ainda sem a tabela: sem audiência, sem canal quente */ }
+    tem = { em: Date.now(), linhas };
+    audienciaGuardada.set(db, tem);
+  }
+  // O mínimo de aberturas vale para a lista dos "N mais vistos". Com "todos", a audiência só
+  // decide a ORDEM em que os canais sobem (e em que seriam desligados, se a máquina apertar).
+  return tem.linhas.filter((x) => semMinimo || x.n >= MINIMO_DE_ABERTURAS).map((x) => x.canal_id).slice(0, quantos);
 }
 
 /**
@@ -484,13 +577,21 @@ function maisVistos(db, quantos = config.aoVivo.quentesAutomaticos, { refazer = 
  */
 function canaisQuentes(canais, db = null) {
   const numeros = new Set(config.aoVivo.quentes);
-  const porAudiencia = maisVistos(db);
+  const alvo = alvoDeQuentes(db);
+  const porAudiencia = maisVistos(db, alvo.todos ? 500 : alvo.quantos, { semMinimo: alvo.todos });
   const ordem = new Map(porAudiencia.map((id, i) => [id, i]));
   const manuais = canais.filter((c) => numeros.has(c.numero));
-  const automaticos = canais.filter((c) => ordem.has(c.id) && !numeros.has(c.numero)).sort((a, b) => ordem.get(a.id) - ordem.get(b.id));
+  const resto = canais.filter((c) => !numeros.has(c.numero));
+  // "Todos": os mais vistos primeiro e depois os demais, na ordem da grade. É a ordem em que
+  // sobem — se a máquina não comportar todos, ficam de fora os que menos gente abre.
+  const automaticos = alvo.todos
+    ? [...resto.filter((c) => ordem.has(c.id)).sort((a, b) => ordem.get(a.id) - ordem.get(b.id)), ...resto.filter((c) => !ordem.has(c.id))]
+    : resto.filter((c) => ordem.has(c.id)).sort((a, b) => ordem.get(a.id) - ordem.get(b.id));
+  resumoDosQuentes = { ...resumoDosQuentes, todos: alvo.todos, canais: canais.length };
   // O teto vale para eles também: canal quente não pode comer a memória toda e deixar o
-  // assinante que abriu um canal qualquer sem lugar.
-  const escolhidos = [...manuais, ...automaticos].slice(0, Math.max(0, config.aoVivo.maxCanais - 5));
+  // assinante que abriu um canal qualquer sem lugar. (Com "todos", o teto já sobe para caber
+  // todos, e quem segura é a medição de memória e processador, na hora de ligar.)
+  const escolhidos = [...manuais, ...automaticos].slice(0, alvo.todos ? canais.length : Math.max(0, config.aoVivo.maxCanais - 5));
   quentesPorAudiencia = new Set(escolhidos.filter((c) => !numeros.has(c.numero)).map((c) => c.id));
   return escolhidos;
 }
@@ -530,10 +631,10 @@ async function garantir(canal, db, { esperarMs = config.aoVivo.esperaPrimeiroPed
   if (!config.aoVivo.ligado) return false;
   if (daParaAssistir(canal.id)) { marcarUso(canal.id); return true; }
   // Teto de canais simultâneos: antes de subir mais um, tenta abrir espaço no que está ocioso.
-  if (!vivos.has(canal.id) && vivos.size >= config.aoVivo.maxCanais) {
+  if (!vivos.has(canal.id) && vivos.size >= tetoDeConversoes()) {
     limparOciosos();
-    if (vivos.size >= config.aoVivo.maxCanais) {
-      throw new ErroNegocio(`O servidor já está convertendo ${config.aoVivo.maxCanais} canais ao mesmo tempo. Tente em instantes.`, 503, { motivo: 'teto' });
+    if (vivos.size >= tetoDeConversoes()) {
+      throw new ErroNegocio(`O servidor já está convertendo ${tetoDeConversoes()} canais ao mesmo tempo. Tente em instantes.`, 503, { motivo: 'teto' });
     }
   }
   const estado = ligar(canal, db);
@@ -723,7 +824,8 @@ function situacao(id) {
 module.exports = {
   PROTOCOLOS, VIDEO_COPIAVEL, AUDIO_COPIAVEL, MELHORIAS, modoDeConversao,
   conferirEndereco, conferir, ligar, desligar, desligarTudo, sincronizar, situacao, temSinal,
-  pedacosNaLista, resumoDaLista, daParaAssistir, maisVistos, canaisQuentes, partidas,
+  pedacosNaLista, resumoDaLista, daParaAssistir, maisVistos, canaisQuentes, partidas, recursos, cabeMaisUm, alvoDeQuentes,
+  resumoDosQuentes: () => ({ ...resumoDosQuentes }),
   garantir, marcarUso, limparOciosos,
   listaDoPlayer, caminhoDoPedaco, pastaDoCanal, listaDoCanal,
 };

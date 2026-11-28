@@ -442,6 +442,21 @@ async function telaConfig(c) {
         return b;
       })(),
       el('span', { class: 'pequeno mudo' }, config.epg_importado_em ? `última importação: ${dataHora(config.epg_importado_em)}` : 'nunca importada')),
+    el('h2', { style: 'margin-top:18px' }, 'Canais ao vivo'),
+    escolha('Canais sempre ligados', 'canais_quentes', [
+      ['', `Padrão do servidor (${servidor.canais_quentes_padrao === 'todos' ? 'todos' : `os ${servidor.canais_quentes_padrao} mais assistidos`})`],
+      ['0', 'Nenhum — todos abrem sob demanda'],
+      ['10', 'Os 10 mais assistidos'],
+      ['20', 'Os 20 mais assistidos'],
+      ['40', 'Os 40 mais assistidos'],
+      ['todos', 'Todos os canais'],
+    ], config.canais_quentes ?? ''),
+    el('p', { class: 'mini apagado', style: 'margin:-6px 0 0' },
+      'Canal ligado abre na hora; canal desligado leva alguns segundos para entrar no ar. Cada canal ligado usa cerca de 60 MB de memória, '
+      + '1,4% de um núcleo e a banda do próprio sinal entrando o dia inteiro, além de uma conexão permanente no fornecedor. '
+      + `Este servidor tem agora ${Number(servidor.recursos.memoriaLivreMB).toLocaleString('pt-BR')} MB livres e ${Number(Number(servidor.recursos.nucleos).toFixed(1)).toLocaleString('pt-BR')} núcleo(s) para o app. `
+      + 'Com "Todos", os canais sobem aos poucos, dos mais assistidos para os menos, e a plataforma para de ligar quando a memória ou o processador chegam ao limite — '
+      + 'os que ficarem de fora continuam abrindo sob demanda. A tela Canais mostra quantos estão ligados.'),
     el('h2', { style: 'margin-top:18px' }, 'Aviso na home'),
     area('Mensagem para os assinantes (em branco não mostra nada)', { name: 'aviso_home', rows: 2, maxlength: 300 }),
     el('div', { class: 'linha fim' }, el('button', { class: 'btn primario' }, 'Salvar configurações')));
@@ -460,6 +475,7 @@ async function telaConfig(c) {
         retomar_folga_s: Number(d.retomar_folga_s),
         epg_url: d.epg_url,
         aviso_home: d.aviso_home,
+        canais_quentes: d.canais_quentes ?? '',
       });
       toast('Configurações salvas.');
     });

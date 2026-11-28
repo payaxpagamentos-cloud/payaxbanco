@@ -603,3 +603,69 @@ test('canais mais assistidos ficam quentes sozinhos, e os marcados à mão têm 
   config.aoVivo.quentesAutomaticos = 0;
   assert.deepEqual(aovivo.canaisQuentes(canais, s.db).map((c) => c.nome), ['Marcado à Mão']);
 });
+
+test('"todos ligados": sobem aos poucos, param no limite da máquina e aliviam se a memória acabar', async (t) => {
+  const s = await iniciar();
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
+  const admin = await s.adminLogin();
+  const antes = { ...config.aoVivo };
+  t.after(() => { Object.assign(config.aoVivo, antes); delete config.aoVivo.recursosFixos; });
+  // Máquina folgada, três canais por rodada, e um teto do .env MENOR que o número de canais —
+  // que "todos" precisa passar por cima, senão metade dos canais nunca ligaria.
+  Object.assign(config.aoVivo, { recursosFixos: { memoriaLivreMB: 8000, nucleos: 4 }, quentesPorRodada: 3, maxCanais: 4, quentes: [], alivioSemUsoMs: 0 });
+
+  const ids = [];
+  for (let n = 1; n <= 8; n += 1) {
+    ids.push((await s.post('/admin/canais', { numero: 200 + n, nome: `Todos ${n}`, fonte: 'rtmp', url_hls: `rtmp://origem.interna/live/t${n}` }, admin)).dados.canal.id);
+  }
+  const ligados = () => ids.filter((id) => aovivo.situacao(id).convertendo).length;
+  assert.equal(ligados(), 0, 'ninguém pediu, ninguém liga');
+
+  // Valor inventado não entra.
+  assert.equal((await s.put('/admin/config', { canais_quentes: 'um monte' }, admin)).status, 422);
+
+  // A escolha no painel vale na hora — mas sobe aos poucos: três por rodada.
+  const salvo = await s.put('/admin/config', { canais_quentes: 'todos' }, admin);
+  assert.equal(salvo.status, 200, JSON.stringify(salvo.dados));
+  assert.equal(salvo.dados.config.canais_quentes, 'todos');
+  assert.equal(ligados(), 3);
+  let painel = (await s.get('/admin/canais', admin)).dados.canais_quentes;
+  assert.deepEqual({ todos: painel.todos, alvo: painel.alvo, ligados: painel.ligados }, { todos: true, alvo: 8, ligados: 3 });
+  assert.match(painel.limite, /aos poucos/);
+
+  aovivo.sincronizar(s.db);
+  assert.equal(ligados(), 6, 'a segunda rodada passa do teto do .env (4): com "todos" ele sobe para caber');
+
+  // Memória abaixo da reserva: para de ligar. Os que já estão no ar continuam.
+  config.aoVivo.recursosFixos = { memoriaLivreMB: 900, nucleos: 4 };
+  aovivo.sincronizar(s.db);
+  assert.equal(ligados(), 6);
+  assert.match(aovivo.resumoDosQuentes().limite, /memória: restam 900 MB/);
+
+  // Processador: com um núcleo só para o app, não sobra nenhum para conversão.
+  config.aoVivo.recursosFixos = { memoriaLivreMB: 8000, nucleos: 1 };
+  aovivo.sincronizar(s.db);
+  assert.equal(ligados(), 6);
+  assert.match(aovivo.resumoDosQuentes().limite, /processador/);
+
+  // Memória no fim (abaixo de metade da reserva): um canal quente sem ninguém assistindo é
+  // desligado por rodada, começando pelo último da fila. Melhor isso que o sistema matar o app.
+  config.aoVivo.recursosFixos = { memoriaLivreMB: 300, nucleos: 4 };
+  aovivo.sincronizar(s.db);
+  assert.equal(ligados(), 5);
+  assert.equal(aovivo.situacao(ids[5]).convertendo, false, 'saiu o sexto, o último que tinha subido');
+  assert.match(aovivo.resumoDosQuentes().limite, /foi desligado para aliviar/);
+
+  // Voltou a folga: retoma de onde parou, e chega nos oito.
+  config.aoVivo.recursosFixos = { memoriaLivreMB: 8000, nucleos: 4 };
+  aovivo.sincronizar(s.db);
+  assert.equal(ligados(), 8);
+  painel = (await s.get('/admin/canais', admin)).dados.canais_quentes;
+  assert.equal(painel.ligados, 8);
+  assert.equal(painel.limite, null, 'todos no ar: não há limite a relatar');
+
+  // E dá para voltar atrás pelo painel: com zero, os canais deixam de ser protegidos e
+  // esfriam sozinhos pelo tempo de ociosidade.
+  assert.equal((await s.put('/admin/config', { canais_quentes: '0' }, admin)).status, 200);
+  assert.equal(aovivo.situacao(ids[0]).quente, false);
+});

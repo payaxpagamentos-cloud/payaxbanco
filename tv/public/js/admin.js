@@ -213,7 +213,7 @@ async function telaAssistindo(c) {
 // ---------------------------------------------------------------- Canais
 
 async function telaCanais(c) {
-  const { canais, relay_ligado: relayLigado, ao_vivo_ligado: aoVivoLigado } = await api.get('/admin/canais');
+  const { canais, relay_ligado: relayLigado, ao_vivo_ligado: aoVivoLigado, canais_quentes: quentes } = await api.get('/admin/canais');
   const planos = usuario.perfil === 'admin' ? (await api.get('/admin/planos')).planos : [];
 
   const formCanal = (canal = null) => modal(canal ? `Canal ${canal.nome}` : 'Novo canal', (fechar) => {
@@ -495,6 +495,13 @@ async function telaCanais(c) {
       ir('canais');
     }),
     botao('Novo canal', 'primario', async () => { if (await formCanal()) ir('canais'); }, 'mais')),
+  // Quantos canais estão sempre ligados e, se não são todos os pedidos, por quê. É a resposta
+  // para "mandei ligar todos e este aqui ainda demora": a máquina diz onde parou.
+  quentes && quentes.alvo > 0 ? el('div', { class: `aviso${quentes.limite ? ' atencao' : ''}`, style: 'margin-bottom:14px' },
+    el('strong', {}, `Sempre ligados: ${quentes.ligados} de ${quentes.alvo} canal(is)`),
+    quentes.todos ? ' (pedido: todos)' : '',
+    quentes.limite ? ` — ${quentes.limite}.` : '.',
+    ' Muda em Configurações → Canais ao vivo.') : null,
   tabela(['Canal', 'Situação', 'No ar agora', '>Ações'], linhas, 'Nenhum canal cadastrado. Comece pelo botão "Novo canal".'));
 }
 

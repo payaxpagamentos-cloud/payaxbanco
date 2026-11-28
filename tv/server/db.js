@@ -449,6 +449,9 @@ const CONFIG_PADRAO = {
   // uma vez por dia (o provedor é escolhido pela operação).
   epg_url: '',
   epg_importado_em: '',
+  // Quantos canais ao vivo ficam sempre ligados: '' (o padrão do servidor), um número (os N
+  // mais assistidos) ou 'todos'. Fica aqui, e não só no .env, para a operação mudar pelo painel.
+  canais_quentes: '',
 };
 
 const agora = () => new Date().toISOString();
@@ -608,6 +611,8 @@ function lerConfig(db) {
     aviso_home: c.aviso_home ?? '',
     epg_url: c.epg_url ?? '',
     epg_importado_em: c.epg_importado_em ?? '',
+    // Quantos canais ficam sempre ligados: '' (o padrão do servidor), um número, ou 'todos'.
+    canais_quentes: c.canais_quentes ?? '',
   };
 }
 

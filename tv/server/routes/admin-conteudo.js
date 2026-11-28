@@ -60,6 +60,7 @@ module.exports = (db) => {
       })),
     relay_ligado: config.relay.ligado,
     ao_vivo_ligado: config.aoVivo.ligado,
+    canais_quentes: aovivo.resumoDosQuentes(),
     protocolos_ao_vivo: aovivo.PROTOCOLOS,
   }));
 

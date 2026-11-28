@@ -164,8 +164,22 @@ module.exports = {
     // aberturas cai em meia dúzia de canais — e dispensa a operação de adivinhar a lista.
     // Cada canal quente custa cerca de 1% de um núcleo e a banda do próprio sinal (3 a 6 Mbps)
     // entrando o dia inteiro. Zero desliga; a lista manual (TV_AO_VIVO_QUENTES) continua valendo.
+    // 'todos' liga todos os que couberem. O painel (Configurações) manda nisto quando preenchido.
     quentesAutomaticos: process.env.TV_AO_VIVO_QUENTES_AUTO === undefined || process.env.TV_AO_VIVO_QUENTES_AUTO === ''
-      ? 10 : Math.max(0, Number(process.env.TV_AO_VIVO_QUENTES_AUTO) || 0),
+      ? 10
+      : String(process.env.TV_AO_VIVO_QUENTES_AUTO).toLowerCase() === 'todos' ? 'todos'
+        : Math.max(0, Number(process.env.TV_AO_VIVO_QUENTES_AUTO) || 0),
+    // Memória que tem de continuar livre no servidor. Cada canal ligado ocupa ~60 MB (medido);
+    // abaixo desta reserva a plataforma para de ligar canal quente, e abaixo da metade dela
+    // desliga os que ninguém está vendo. É o que impede "todos ligados" de derrubar o servidor
+    // por falta de memória — o sistema operacional mataria um processo qualquer, e podia ser o app.
+    reservaMemoriaMB: Number(process.env.TV_AO_VIVO_RESERVA_MB) || 1024,
+    // Quantos canais quentes sobem por rodada (uma rodada a cada 30 s). Subir cem de uma vez
+    // seriam cem conexões simultâneas no fornecedor e um pico de processador; aos poucos, a
+    // memória medida na rodada seguinte já conta os que acabaram de subir.
+    quentesPorRodada: Number(process.env.TV_AO_VIVO_QUENTES_POR_RODADA) || 6,
+    // Canal quente só é desligado para aliviar a memória se ninguém o abriu neste intervalo.
+    alivioSemUsoMs: 2 * 60_000,
     // Quanto o assinante espera, ao abrir um canal frio, antes de a plataforma desistir.
     //
     // Precisa caber a conversão dos três pedaços iniciais, que ficam prontos lá pelos 12s: um
