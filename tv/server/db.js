@@ -456,6 +456,9 @@ const CONFIG_PADRAO = {
   // fornecedor. Menor que isso faz o canal frio abrir mais cedo e deixa menos margem para a
   // rede entre a origem e este servidor.
   srt_atraso_ms: '',
+  // '1' quando a operação dispensou o aviso que recomenda a senha de atualização. O aviso sai
+  // da tela; a proteção continua desligada até a senha ser cadastrada no servidor.
+  aviso_senha_oculto: '',
 };
 
 const agora = () => new Date().toISOString();
@@ -618,6 +621,7 @@ function lerConfig(db) {
     // Quantos canais ficam sempre ligados: '' (o padrão do servidor), um número, ou 'todos'.
     canais_quentes: c.canais_quentes ?? '',
     srt_atraso_ms: c.srt_atraso_ms ?? '',
+    aviso_senha_oculto: c.aviso_senha_oculto ?? '',
   };
 }
 

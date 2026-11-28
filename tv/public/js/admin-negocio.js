@@ -527,6 +527,31 @@ async function blocoSistema() {
     // Senha de atualização: existe quando foi cadastrada no servidor. É conferida lá fora, pelo
     // agente — o painel só repassa o que foi digitado aqui.
     const senha = el('input', { type: 'password', autocomplete: 'off', placeholder: 'Senha de atualização' });
+    // O que explica a senha de atualização. Em destaque até a operação dispensar; depois,
+    // recolhido numa linha — a informação não some, só deixa de ocupar a tela.
+    const comando = () => [
+      // Em letra de máquina e sem ligaduras: na fonte do painel os dois hifens de "--senha"
+      // se juntavam num traço só. Tocar seleciona a linha inteira, para copiar.
+      el('code', { style: 'display:block;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;'
+        + 'font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;user-select:all;-webkit-user-select:all;word-break:break-all' },
+      'sudo bash /opt/playtechvip/scripts/atualizador.sh --senha'),
+      el('div', { class: 'mini', style: 'margin-top:6px' }, 'São dois hifens antes de "senha". Precisa do terminal do servidor; pelo celular não dá.'),
+    ];
+    const TEXTO = 'Hoje, quem tiver a senha de um administrador consegue atualizar a plataforma — e um pacote de atualização manda no '
+      + 'servidor inteiro. Para exigir uma senha separada a cada envio, rode uma vez no servidor:';
+    const protecao = () => (s.aviso_senha_oculto
+      ? el('details', { style: 'margin-bottom:12px' },
+        el('summary', { class: 'mini apagado' }, 'Proteger as atualizações com senha (opcional)'),
+        el('div', { class: 'pequeno mudo', style: 'margin-top:8px' }, TEXTO, ...comando()))
+      : el('div', { class: 'aviso atencao', style: 'margin-bottom:12px' },
+        `Proteção recomendada: ${TEXTO[0].toLowerCase()}${TEXTO.slice(1)}`, ...comando(),
+        el('div', { style: 'margin-top:10px' },
+          botao('Não mostrar mais', 'vazio', async () => {
+            await api.put('/admin/config', { aviso_senha_oculto: true });
+            desenhar({ ...s, aviso_senha_oculto: true });
+            toast('Aviso dispensado. A explicação continua aqui, recolhida.');
+          }))));
+
     const enviar = botao('Enviar e atualizar', 'primario', async () => {
       const f = arquivo.files?.[0];
       if (!f) throw new Error('Escolha o arquivo .tar.gz da atualização.');
@@ -565,16 +590,7 @@ async function blocoSistema() {
             ? el('label', { class: 'campo', style: 'margin-bottom:12px' }, 'Senha de atualização', senha,
               el('div', { class: 'mini apagado', style: 'margin-top:6px' },
                 'É a senha cadastrada no servidor só para atualizar. Não é a do seu login.'))
-            : el('div', { class: 'aviso atencao', style: 'margin-bottom:12px' },
-              'Proteção recomendada: hoje, quem tiver a senha de um administrador consegue atualizar a plataforma — e um pacote '
-              + 'de atualização manda no servidor inteiro. Para exigir uma senha separada a cada envio, rode uma vez no servidor:',
-              // Em letra de máquina e sem ligaduras: na fonte do painel os dois hifens de
-              // "--senha" se juntavam num traço só, e quem digitasse o que via na tela rodava
-              // um comando que não fazia nada. Tocar seleciona a linha inteira, para copiar.
-              el('code', { style: 'display:block;margin-top:8px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;'
-                + 'font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;user-select:all;-webkit-user-select:all;word-break:break-all' },
-              'sudo bash /opt/playtechvip/scripts/atualizador.sh --senha'),
-              el('div', { class: 'mini', style: 'margin-top:6px' }, 'São dois hifens antes de "senha".')),
+            : protecao(),
           el('div', { class: 'linha' }, enviar)),
       s.na_fila ? el('div', { class: 'aviso atencao', style: 'margin-top:14px' },
         `Há um pacote na fila, enviado por ${s.na_fila.por}. O servidor aplica em até um minuto.`) : null,

@@ -339,7 +339,7 @@ module.exports = (db) => {
   // ---------------- Sistema ----------------
 
   /** Versão instalada, pedido na fila e como terminou a última atualização. */
-  r.get('/sistema', soAdmin, (_req, res) => res.json(sistema.estado()));
+  r.get('/sistema', soAdmin, (_req, res) => res.json({ ...sistema.estado(), aviso_senha_oculto: lerConfig(db).aviso_senha_oculto === '1' }));
 
   /**
    * Recebe o pacote da atualização e deixa na pasta que o agente do servidor acompanha.
@@ -371,7 +371,7 @@ module.exports = (db) => {
         throw new ErroNegocio(e.message, 400);
       }
       registrar(db, req, 'atualizacao_enviada', { bytes: pedido.bytes, sha256: pedido.sha256.slice(0, 16) });
-      res.status(202).json({ pedido, estado: sistema.estado() });
+      res.status(202).json({ pedido, estado: { ...sistema.estado(), aviso_senha_oculto: lerConfig(db).aviso_senha_oculto === '1' } });
     });
 
   // ---------------- Equipe ----------------
@@ -452,6 +452,7 @@ module.exports = (db) => {
       const q = String(d.canais_quentes ?? '').trim().toLowerCase();
       valores.canais_quentes = q === '' || q === 'todos' ? q : String(v.inteiro(q, 'a quantidade de canais sempre ligados', { min: 0, max: 500 }));
     }
+    if (d.aviso_senha_oculto !== undefined) valores.aviso_senha_oculto = v.booleano(d.aviso_senha_oculto) ? '1' : '';
     if (d.srt_atraso_ms !== undefined) {
       const a = String(d.srt_atraso_ms ?? '').trim();
       valores.srt_atraso_ms = a === '' ? '' : String(v.opcao(Number(a), 'o atraso do SRT', [500, 1000]));
