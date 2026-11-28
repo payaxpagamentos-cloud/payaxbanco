@@ -452,6 +452,10 @@ const CONFIG_PADRAO = {
   // Quantos canais ao vivo ficam sempre ligados: '' (o padrão do servidor), um número (os N
   // mais assistidos) ou 'todos'. Fica aqui, e não só no .env, para a operação mudar pelo painel.
   canais_quentes: '',
+  // Teto para o atraso (latency) do SRT, em milissegundos: '' mantém o que veio no endereço do
+  // fornecedor. Menor que isso faz o canal frio abrir mais cedo e deixa menos margem para a
+  // rede entre a origem e este servidor.
+  srt_atraso_ms: '',
 };
 
 const agora = () => new Date().toISOString();
@@ -613,6 +617,7 @@ function lerConfig(db) {
     epg_importado_em: c.epg_importado_em ?? '',
     // Quantos canais ficam sempre ligados: '' (o padrão do servidor), um número, ou 'todos'.
     canais_quentes: c.canais_quentes ?? '',
+    srt_atraso_ms: c.srt_atraso_ms ?? '',
   };
 }
 

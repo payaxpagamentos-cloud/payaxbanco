@@ -12,7 +12,7 @@
  * Ao publicar uma versão nova do app, mude VERSAO: o navegador troca tudo na próxima abertura.
  */
 
-const VERSAO = 'v10';
+const VERSAO = 'v12';
 const CASCA = `playtechvip-casca-${VERSAO}`;
 const ARTES = `playtechvip-artes-${VERSAO}`;
 const ARTES_MAX = 150;
@@ -37,7 +37,7 @@ const DO_APP = [
   // Os `admin*` ficam de fora de propósito: o painel é outra página e não funciona sem rede.
   ...['api', 'app', 'autoplay', 'cartazes-demo', 'cartoes', 'conta', 'entrada', 'envio',
     'excluir-conta', 'instalar', 'login-icones', 'mascotes', 'motor-nativo', 'perfis',
-    'player', 'titulo', 'tv', 'ui', 'vigia', 'vitrine']
+    'player', 'ritmo', 'titulo', 'tv', 'ui', 'vigia', 'vitrine']
     .map((n) => `./js/${n}.js`),
 ].map(arquivo);
 

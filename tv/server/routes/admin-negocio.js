@@ -452,6 +452,10 @@ module.exports = (db) => {
       const q = String(d.canais_quentes ?? '').trim().toLowerCase();
       valores.canais_quentes = q === '' || q === 'todos' ? q : String(v.inteiro(q, 'a quantidade de canais sempre ligados', { min: 0, max: 500 }));
     }
+    if (d.srt_atraso_ms !== undefined) {
+      const a = String(d.srt_atraso_ms ?? '').trim();
+      valores.srt_atraso_ms = a === '' ? '' : String(v.opcao(Number(a), 'o atraso do SRT', [500, 1000]));
+    }
     gravarConfig(db, valores);
     // A escolha dos canais ligados vale já, sem esperar a rodada de 30 s.
     if (valores.canais_quentes !== undefined) aovivo.sincronizar(db);

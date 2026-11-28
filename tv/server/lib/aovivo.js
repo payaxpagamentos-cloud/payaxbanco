@@ -244,7 +244,7 @@ function ligar(canal, db) {
     // ou 2 s, o que vier primeiro. Num canal de 3 a 6 Mbps isso é 1,5 a 3 s de vídeo — cabe
     // um quadro-chave e os primeiros quadros de áudio, que é o que o ffmpeg precisa conhecer.
     ...(rapida ? ['-analyzeduration', '2000000', '-probesize', '1000000'] : []),
-    '-i', canal.url_hls,
+    '-i', comAtrasoSrt(canal.url_hls, db),
     // Só vídeo e áudio: dado e legenda embutidos de alguns sinais não cabem em MPEG-TS e
     // derrubariam a conversão no meio.
     '-map', '0:v:0', '-map', '0:a:0?',
@@ -343,6 +343,58 @@ function ligar(canal, db) {
 }
 
 /**
+ * Aplica o teto de atraso do SRT escolhido no painel.
+ *
+ * O `latency` do SRT é quanto o receptor segura o sinal antes de entregar, para dar tempo de
+ * repor pacote perdido. O fornecedor manda 2 s no endereço, que serve para atravessar a
+ * internet; com a origem na mesma rede do servidor, meio segundo sobra — e esse tempo sai
+ * inteiro da espera de quem abre um canal frio. Só DIMINUI: se o endereço já pede menos, fica.
+ * (O valor de verdade é o maior entre os dois lados; se a origem exigir mais, vale o dela, e
+ * baixar aqui simplesmente não tem efeito.)
+ */
+function comAtrasoSrt(url, db) {
+  if (!/^srt:/i.test(String(url))) return url;
+  let tetoMs = 0;
+  try { tetoMs = Number(lerConfig(db).srt_atraso_ms) || 0; } catch { /* sem banco: fica como veio */ }
+  if (!(tetoMs > 0)) return url;
+  const tetoUs = Math.round(tetoMs * 1000);
+  if (!/[?&]latency=\d+/i.test(url)) return `${url}${url.includes('?') ? '&' : '?'}latency=${tetoUs}`;
+  return url.replace(/([?&]latency=)(\d+)/i, (_t, antes, n) => `${antes}${Math.min(Number(n), tetoUs)}`);
+}
+
+/**
+ * Liga o canal "por intenção": o assinante parou o foco nele (controle remoto na TV, ponteiro
+ * no computador) mas ainda não abriu.
+ *
+ * Entre parar no canal e apertar OK passam um, dois, três segundos — tempo em que a conversão
+ * já pode estar subindo. Quando ele abre, parte da espera já foi paga.
+ *
+ * Com freios, porque isto liga processo sem ninguém ter pedido para assistir:
+ * - só liga se couber (memória, processador e teto), e nunca tira lugar de quem está vendo;
+ * - cada conta pode ter dois canais aquecendo por vez;
+ * - o canal aquecido e não aberto cai sozinho em 45 s (`aquecidoSegundos`).
+ * Devolve o que fez, para a rota responder sem mistério.
+ */
+const aquecendoPorConta = new Map();   // usuarioId -> Map(canalId -> até quando)
+function aquecer(canal, db, usuarioId) {
+  if (!config.aoVivo.ligado || !config.aoVivo.sobDemanda) return { aquecendo: false, motivo: 'desligado' };
+  if (vivos.has(canal.id)) return { aquecendo: true, motivo: 'ja_ligado' };
+  const agoraMs = Date.now();
+  let meus = aquecendoPorConta.get(usuarioId);
+  if (!meus) aquecendoPorConta.set(usuarioId, meus = new Map());
+  for (const [id, ate] of meus) if (ate <= agoraMs || !vivos.has(id)) meus.delete(id);
+  if (meus.size >= 2) return { aquecendo: false, motivo: 'limite_da_conta' };
+  if (vivos.size >= tetoDeConversoes() - 2 || !cabeMaisUm().cabe) return { aquecendo: false, motivo: 'sem_folga' };
+  const estado = ligar(canal, db);
+  // "Usado" no passado, de modo que a limpeza de ociosos o desligue em `aquecidoSegundos` se
+  // ninguém abrir. Abrir de verdade (`garantir`) marca o uso de agora e ele passa a valer normal.
+  estado.ultimoUso = agoraMs - (config.aoVivo.ociosoSegundos - config.aoVivo.aquecidoSegundos) * 1000;
+  meus.set(canal.id, agoraMs + config.aoVivo.aquecidoSegundos * 1000);
+  if (aquecendoPorConta.size > 5000) for (const [u, m] of aquecendoPorConta) if (!m.size) aquecendoPorConta.delete(u);
+  return { aquecendo: true, motivo: 'ligado' };
+}
+
+/**
  * Desliga a conversão e apaga os pedaços do canal.
  *
  * A limpeza espera o ffmpeg morrer de verdade. Apagar a pasta logo depois do SIGTERM parece
@@ -398,6 +450,7 @@ function desligarTudo({ esperarMs = 5000 } = {}) {
   partidas.clear();
   semAnaliseRapida.clear();
   quentesPorAudiencia = new Set();
+  aquecendoPorConta.clear();
   resumoDosQuentes = { todos: false, canais: 0, alvo: 0, ligados: 0, limite: null };
   if (!processos.length) return Promise.resolve();
   return Promise.race([
@@ -826,6 +879,7 @@ module.exports = {
   conferirEndereco, conferir, ligar, desligar, desligarTudo, sincronizar, situacao, temSinal,
   pedacosNaLista, resumoDaLista, daParaAssistir, maisVistos, canaisQuentes, partidas, recursos, cabeMaisUm, alvoDeQuentes,
   resumoDosQuentes: () => ({ ...resumoDosQuentes }),
+  aquecer, comAtrasoSrt,
   garantir, marcarUso, limparOciosos,
   listaDoPlayer, caminhoDoPedaco, pastaDoCanal, listaDoCanal,
 };

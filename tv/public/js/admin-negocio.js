@@ -457,6 +457,15 @@ async function telaConfig(c) {
       + `Este servidor tem agora ${Number(servidor.recursos.memoriaLivreMB).toLocaleString('pt-BR')} MB livres e ${Number(Number(servidor.recursos.nucleos).toFixed(1)).toLocaleString('pt-BR')} núcleo(s) para o app. `
       + 'Com "Todos", os canais sobem aos poucos, dos mais assistidos para os menos, e a plataforma para de ligar quando a memória ou o processador chegam ao limite — '
       + 'os que ficarem de fora continuam abrindo sob demanda. A tela Canais mostra quantos estão ligados.'),
+    escolha('Atraso do sinal SRT', 'srt_atraso_ms', [
+      ['', 'Como veio do fornecedor (normalmente 2 segundos)'],
+      ['1000', 'No máximo 1 segundo'],
+      ['500', 'No máximo meio segundo'],
+    ], config.srt_atraso_ms ?? ''),
+    el('p', { class: 'mini apagado', style: 'margin:-6px 0 0' },
+      'É quanto a plataforma segura o sinal antes de usar, para repor pacote perdido no caminho. Menos atraso faz o canal desligado abrir mais cedo '
+      + '(até 1,5 segundo a menos). Só diminua se a origem do fornecedor estiver na mesma rede deste servidor: com rede ruim entre os dois, a imagem pica. '
+      + 'Se a origem exigir mais, vale o dela e esta opção não tem efeito. A mudança vale para os canais que ligarem depois de salvar.'),
     el('h2', { style: 'margin-top:18px' }, 'Aviso na home'),
     area('Mensagem para os assinantes (em branco não mostra nada)', { name: 'aviso_home', rows: 2, maxlength: 300 }),
     el('div', { class: 'linha fim' }, el('button', { class: 'btn primario' }, 'Salvar configurações')));
@@ -476,6 +485,7 @@ async function telaConfig(c) {
         epg_url: d.epg_url,
         aviso_home: d.aviso_home,
         canais_quentes: d.canais_quentes ?? '',
+        srt_atraso_ms: d.srt_atraso_ms ?? '',
       });
       toast('Configurações salvas.');
     });

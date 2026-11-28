@@ -2,6 +2,7 @@ import { api, BASE, ErroApi, absoluto } from './api.js';
 import { el, icone, relogio, duracao, toast, modal, acao, nomeDoAparelho, etiquetaIdade, QUALIDADES, LINHAS_QUALIDADE } from './ui.js';
 import { temPonteAndroid, criarVideoTizen, tocarNoAndroidTV } from './motor-nativo.js';
 import { vigiarReproducao } from './vigia.js';
+import { cuidarDaReserva } from './ritmo.js';
 import { iniciarReproducao } from './autoplay.js';
 
 /**
@@ -399,6 +400,11 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     tentarTocar();
   }
 
+  // Canal ao vivo tocado pelo hls.js: se começou com pouca reserva (canal que estava frio), ela
+  // é reconstruída aos poucos (ver ritmo.js). No player nativo do iPhone e das TVs quem cuida
+  // do ritmo é o próprio aparelho, e ali não se mexe.
+  const pararRitmo = aoVivo && hls ? cuidarDaReserva(video) : () => {};
+
   const vigia = vigiarReproducao(video, {
     aoVivo,
     remedios: [
@@ -736,6 +742,7 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     // está saindo tem o vídeo parado por definição: deixá-lo correr durante o encerramento
     // reabriria a conversão de um canal que ninguém está mais vendo.
     vigia.parar();
+    pararRitmo();
     clearInterval(pararPing);
     clearInterval(pararSalvar);
     clearTimeout(esconder);

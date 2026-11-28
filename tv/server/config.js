@@ -108,7 +108,10 @@ module.exports = {
     // segundos faz a espera ser a mesma seja qual for o tamanho do pedaço. Oito segundos é a
     // folga com que o canal começa; com um pedaço só, o player grudava na ponta sem reserva e
     // travava na primeira oscilação — foi medido assim, e por isso o mínimo de dois pedaços.
-    segundosParaComecar: Number(process.env.TV_AO_VIVO_SEGUNDOS_INICIO) || 8,
+    // Seis segundos: três pedaços iniciais de 2 s. Eram oito; os dois a menos são dois segundos
+    // a menos de espera em todo canal frio, ao preço de o canal começar com menos reserva
+    // (medido: 2,6 a 6 s, contra 4,6 a 8 s). Abaixo disto o canal começa a travar na partida.
+    segundosParaComecar: Number(process.env.TV_AO_VIVO_SEGUNDOS_INICIO) || 6,
     pedacosParaComecar: Number(process.env.TV_AO_VIVO_PEDACOS_INICIO) || 2,
     // Tamanho dos PRIMEIROS pedaços de um canal que acabou de ligar. Menores que os de regime,
     // para a lista juntar os segundos de partida mais cedo e em passos mais finos: com pedaço de
@@ -180,6 +183,10 @@ module.exports = {
     quentesPorRodada: Number(process.env.TV_AO_VIVO_QUENTES_POR_RODADA) || 6,
     // Canal quente só é desligado para aliviar a memória se ninguém o abriu neste intervalo.
     alivioSemUsoMs: 2 * 60_000,
+    // Canal ligado "por intenção" (o assinante parou o foco nele, ainda sem abrir) fica de pé
+    // só por este tempo se ninguém abrir de fato. Curto de propósito: quem passeia pela lista
+    // não pode deixar um rastro de canais convertendo.
+    aquecidoSegundos: Number(process.env.TV_AO_VIVO_AQUECIDO_S) || 45,
     // Quanto o assinante espera, ao abrir um canal frio, antes de a plataforma desistir.
     //
     // Precisa caber a conversão dos três pedaços iniciais, que ficam prontos lá pelos 12s: um

@@ -1,4 +1,4 @@
-import { arte } from './api.js';
+import { arte, api } from './api.js';
 import { el, icone, duracao, etiquetaIdade, limpar, hora } from './ui.js';
 import { ehTV } from './tv.js';
 
@@ -148,7 +148,42 @@ export function canalCartao(canal, { aoAbrir } = {}) {
       canal.depois ? el('div', { class: 'mini apagado', style: 'margin-top:5px' }, `depois · ${hora(canal.depois.inicio)} ${canal.depois.titulo}`) : null),
     canal.bloqueado ? el('span', { class: 'etiqueta plano' }, canal.plano_nome ?? 'Plano') : null);
   b.addEventListener('click', () => aoAbrir?.(canal));
+  avisarIntencao(b, canal);
   return b;
+}
+
+/**
+ * Avisa o servidor quando o assinante PARA num canal, antes de abrir.
+ *
+ * Entre o foco pousar num canal e o OK do controle remoto passam um, dois, três segundos; no
+ * computador, o ponteiro descansa sobre o cartão antes do clique. O servidor usa esse tempo
+ * para ir subindo o canal, e quando o assinante abre parte da espera já passou.
+ *
+ * Só depois de uma pausa (quem está só descendo a lista não dispara nada), uma vez por canal
+ * a cada minuto, e sem nunca atrapalhar: se o aviso falhar, ninguém fica sabendo — abrir o
+ * canal funciona do mesmo jeito. No celular não existe "parar em cima"; ali o aviso sai no
+ * toque, que chega um instante antes do clique.
+ */
+const avisados = new Map();   // canalId -> quando foi o último aviso
+function avisarIntencao(botao, canal) {
+  if (canal.bloqueado || canal.fonte !== 'rtmp') return;
+  let relogio = null;
+  const avisar = () => {
+    const agora = Date.now();
+    if (agora - (avisados.get(canal.id) ?? 0) < 60_000) return;
+    avisados.set(canal.id, agora);
+    api.post(`/tv/canais/${canal.id}/aquecer`).catch(() => {});
+  };
+  const armar = (ms) => { clearTimeout(relogio); relogio = setTimeout(avisar, ms); };
+  const desarmar = () => clearTimeout(relogio);
+  // Na TV o foco anda de cartão em cartão: 900 ms parado é intenção, menos que isso é passagem.
+  botao.addEventListener('focus', () => armar(ehTV ? 900 : 1200));
+  botao.addEventListener('blur', desarmar);
+  if (PONTEIRO_FINO()) {
+    botao.addEventListener('pointerenter', () => armar(500));
+    botao.addEventListener('pointerleave', desarmar);
+  }
+  botao.addEventListener('touchstart', avisar, { passive: true });
 }
 
 /** Fileira com rolagem lateral e setas nas pontas. */

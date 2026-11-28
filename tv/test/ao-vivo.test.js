@@ -305,27 +305,27 @@ test('o canal só é entregue com folga de buffer, não no primeiro pedaço', as
   assert.equal(aovivo.pedacosNaLista(7), 0);
   assert.equal(aovivo.daParaAssistir(7), false);
 
-  // A regra é em SEGUNDOS de vídeo na lista (8), com um mínimo de dois pedaços. Antes era
+  // A regra é em SEGUNDOS de vídeo na lista (6), com um mínimo de dois pedaços. Antes era
   // "três pedaços", o que com pedaço de 4 s dava 12 s de espera e com pedaço de 8 s dava 24.
 
   // Um pedaço só: HÁ sinal, mas não dá para assistir sem travar — nem quando ele sozinho já
-  // tem os 8 s. O player ficaria na ponta, esperando o pedaço seguinte nascer inteiro.
+  // tem os 6 s. O player ficaria na ponta, esperando o pedaço seguinte nascer inteiro.
   // "Tem sinal" e "dá para assistir" não são a mesma coisa.
-  for (const [n, s] of [[1, 4], [1, 8], [1, 10]]) {
+  for (const [n, s] of [[1, 4], [1, 6], [1, 10]]) {
     fs.writeFileSync(arquivo, lista(n, s));
     assert.equal(aovivo.pedacosNaLista(7), n);
     assert.equal(aovivo.temSinal(7), true, 'com um pedaço já há sinal');
     assert.equal(aovivo.daParaAssistir(7), false, `um pedaço de ${s} s não basta`);
   }
 
-  // Pedaços iniciais de 2 s (os de um canal que acabou de ligar): três são 6 s, falta; quatro
-  // são 8 s, entrega.
+  // Pedaços iniciais de 2 s (os de um canal que acabou de ligar): dois são 4 s, falta; três
+  // são os 6 s, entrega.
+  fs.writeFileSync(arquivo, lista(2, 2));
+  assert.equal(aovivo.daParaAssistir(7), false, 'dois pedaços de 2 s são só 4 s');
   fs.writeFileSync(arquivo, lista(3, 2));
-  assert.equal(aovivo.daParaAssistir(7), false, 'três pedaços de 2 s são só 6 s');
-  fs.writeFileSync(arquivo, lista(4, 2));
-  assert.equal(aovivo.daParaAssistir(7), true, 'quatro pedaços de 2 s são os 8 s');
+  assert.equal(aovivo.daParaAssistir(7), true, 'três pedaços de 2 s são os 6 s');
 
-  // Pedaços de regime de 4 s: dois já são 8 s.
+  // Pedaços de regime de 4 s: dois são 8 s, passa com folga.
   fs.writeFileSync(arquivo, lista(2, 4));
   assert.equal(aovivo.daParaAssistir(7), true);
 
@@ -668,4 +668,80 @@ test('"todos ligados": sobem aos poucos, param no limite da máquina e aliviam s
   // esfriam sozinhos pelo tempo de ociosidade.
   assert.equal((await s.put('/admin/config', { canais_quentes: '0' }, admin)).status, 200);
   assert.equal(aovivo.situacao(ids[0]).quente, false);
+});
+
+test('parar num canal começa a ligá-lo, com freios — e ele cai sozinho se ninguém abrir', async (t) => {
+  const s = await iniciar();
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
+  const admin = await s.adminLogin();
+  const antes = { ...config.aoVivo };
+  t.after(() => { Object.assign(config.aoVivo, antes); delete config.aoVivo.recursosFixos; });
+  Object.assign(config.aoVivo, { recursosFixos: { memoriaLivreMB: 8000, nucleos: 4 }, quentes: [], quentesAutomaticos: 0, ociosoSegundos: 900, aquecidoSegundos: 45 });
+
+  const ids = [];
+  for (let n = 1; n <= 4; n += 1) {
+    ids.push((await s.post('/admin/canais', { numero: 300 + n, nome: `Intenção ${n}`, fonte: 'rtmp', url_hls: `rtmp://origem.interna/live/i${n}` }, admin)).dados.canal.id);
+  }
+  const hls = (await s.post('/admin/canais', { numero: 399, nome: 'Não Convertido', url_hls: 'https://origem.test/x.m3u8' }, admin)).dados.canal;
+  const c = await s.assinante('intencao@exemplo.com.br', { plano: 2 });
+  const aquecer = (id, quem = c) => s.post(`/tv/canais/${id}/aquecer`, {}, quem.token, quem.comPerfil);
+
+  // Parou no canal: ele começa a subir, sem abrir tela nem ocupar vaga do plano.
+  const r1 = await aquecer(ids[0]);
+  assert.equal(r1.status, 200);
+  assert.deepEqual(r1.dados, { aquecendo: true, motivo: 'ligado' });
+  assert.equal(aovivo.situacao(ids[0]).convertendo, true);
+  assert.equal(s.db.prepare('SELECT COUNT(*) AS n FROM sessoes_player').get().n, 0, 'aquecer não abre sessão');
+
+  // De novo no mesmo: já está ligado, nada a fazer.
+  assert.equal((await aquecer(ids[0])).dados.motivo, 'ja_ligado');
+
+  // Dois por conta: o terceiro não liga. Quem desce a lista parando em tudo não enche o servidor.
+  assert.equal((await aquecer(ids[1])).dados.aquecendo, true);
+  const r3 = await aquecer(ids[2]);
+  assert.deepEqual(r3.dados, { aquecendo: false, motivo: 'limite_da_conta' });
+  assert.equal(aovivo.situacao(ids[2]).convertendo, false);
+
+  // Canal que não é convertido por nós não tem o que aquecer; canal inexistente é 404.
+  assert.equal((await aquecer(hls.id)).dados.motivo, 'nao_se_aplica');
+  assert.equal((await aquecer(999999)).status, 404);
+
+  // Sem folga na máquina, intenção não liga nada: quem está assistindo vem primeiro.
+  const outro = await s.assinante('intencao2@exemplo.com.br', { plano: 2 });
+  config.aoVivo.recursosFixos = { memoriaLivreMB: 500, nucleos: 4 };
+  assert.deepEqual((await aquecer(ids[3], outro)).dados, { aquecendo: false, motivo: 'sem_folga' });
+  config.aoVivo.recursosFixos = { memoriaLivreMB: 8000, nucleos: 4 };
+
+  // Ninguém abriu: passados os 45 s, a limpeza desliga. (Aqui o prazo vira zero para não esperar.)
+  // O que foi ABERTO de verdade continua: abrir marca o uso de agora.
+  const aberto = await s.post('/play/abrir', { tipo: 'canal', canal_id: ids[1] }, c.token, c.comPerfil);
+  assert.equal(aberto.status, 201, JSON.stringify(aberto.dados));
+  config.aoVivo.ociosoSegundos = 44;   // o aquecido "usou" há 855 s; o aberto, agora
+  aovivo.limparOciosos();
+  assert.equal(aovivo.situacao(ids[0]).convertendo, false, 'aquecido e não aberto cai sozinho');
+  assert.equal(aovivo.situacao(ids[1]).convertendo, true, 'o que foi aberto fica');
+});
+
+test('teto do atraso SRT: só diminui, só em SRT, e não mexe no resto do endereço', async (t) => {
+  const s = await iniciar();
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
+  const admin = await s.adminLogin();
+  const srt = 'srt://45.0.0.1:5000?streamid=#!::r=GLOBO_HD,m=request&latency=2000000';
+
+  // Sem escolha no painel, o endereço passa como veio.
+  assert.equal(aovivo.comAtrasoSrt(srt, s.db), srt);
+
+  assert.equal((await s.put('/admin/config', { srt_atraso_ms: '250' }, admin)).status, 422, 'só os valores oferecidos');
+  assert.equal((await s.put('/admin/config', { srt_atraso_ms: '500' }, admin)).status, 200);
+  assert.equal(aovivo.comAtrasoSrt(srt, s.db), 'srt://45.0.0.1:5000?streamid=#!::r=GLOBO_HD,m=request&latency=500000');
+  // Endereço que já pede menos fica como está: a opção é um teto, não um valor fixo.
+  assert.equal(aovivo.comAtrasoSrt('srt://45.0.0.1:5000?latency=200000', s.db), 'srt://45.0.0.1:5000?latency=200000');
+  // Sem o parâmetro, ele entra.
+  assert.equal(aovivo.comAtrasoSrt('srt://45.0.0.1:5000?mode=caller', s.db), 'srt://45.0.0.1:5000?mode=caller&latency=500000');
+  // RTMP não tem esse parâmetro: intocado.
+  assert.equal(aovivo.comAtrasoSrt('rtmp://origem/live/canal', s.db), 'rtmp://origem/live/canal');
+
+  // Voltar ao padrão desfaz.
+  assert.equal((await s.put('/admin/config', { srt_atraso_ms: '' }, admin)).status, 200);
+  assert.equal(aovivo.comAtrasoSrt(srt, s.db), srt);
 });

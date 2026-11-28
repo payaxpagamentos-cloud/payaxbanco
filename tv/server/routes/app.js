@@ -9,6 +9,7 @@ const player = require('../lib/player');
 const epg = require('../lib/epg');
 const v = require('../lib/validacao');
 const embed = require('../lib/embed');
+const aovivo = require('../lib/aovivo');
 const { memoriaPorBanco } = require('../lib/memoria');
 
 // O guia pronto, em texto, por faixa etária e plano (ver a rota /guia).
@@ -42,6 +43,21 @@ module.exports = (db) => {
     const de = new Date(Date.now() - 2 * 3600_000).toISOString();
     const ate = new Date(Date.now() + 36 * 3600_000).toISOString();
     res.json({ canal, grade: epg.grade(db, { canalId: id, de, ate }).map((p) => ({ ...p, ao_vivo: Boolean(p.ao_vivo), andamento: epg.andamento(p) })) });
+  });
+
+  /**
+   * Aviso de intenção: o assinante parou num canal e provavelmente vai abrir. Se couber, o
+   * canal começa a subir já (ver `aovivo.aquecer`). Não abre tela, não ocupa vaga do plano e
+   * passa pelas mesmas permissões de abrir — canal bloqueado ou fora da faixa etária não liga.
+   */
+  r.post('/canais/:id/aquecer', (req, res) => {
+    const id = v.inteiro(req.params.id, 'o canal', { min: 1 });
+    const visivel = catalogo.canaisAoVivo(db, req.perfilView, req.acesso).find((c) => c.id === id);
+    if (!visivel) throw naoEncontrado('Canal');
+    if (visivel.bloqueado || visivel.fonte !== 'rtmp') return res.json({ aquecendo: false, motivo: 'nao_se_aplica' });
+    const canal = db.prepare("SELECT id, numero, nome, url_hls, sinal_video, sinal_audio, melhoria FROM canais WHERE id = ? AND ativo = 1 AND fonte = 'rtmp' AND url_hls IS NOT NULL AND url_hls <> ''").get(id);
+    if (!canal) return res.json({ aquecendo: false, motivo: 'nao_se_aplica' });
+    return res.json(aovivo.aquecer(canal, db, req.usuario.id));
   });
 
   /**
