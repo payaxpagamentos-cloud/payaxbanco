@@ -1015,11 +1015,18 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
 /* Celular: a entrada inteira numa tela só, sem rolar.
    O formulário, a chamada e os cartazes somavam 1.150 px numa tela de 932 (e nas menores a
    distância era maior): o cartão de login ocupava o aparelho quase inteiro e o resto ficava
-   escondido embaixo. Aqui tudo encolhe em função da ALTURA da tela (svh), que é o que falta
-   — a largura do celular é sempre a mesma, o que muda de um aparelho para outro é a altura.
-   Os tamanhos saíram de medição em oito telas, de 640 a 932 px de altura.
-   O campo de texto fica em 16 px de propósito: abaixo disso o iPhone dá zoom na página ao
-   tocar no campo. */
+   escondido embaixo.
+
+   A primeira tentativa encolheu tudo por igual e a operação não gostou: o cartão ficou miúdo.
+   O acerto foi outro — o cartão, as letras e os botões ficam perto do tamanho original, que é
+   o que se usa e se lê; quem cede é o que é enfeite. Saem duas linhas pequenas ("Acesso
+   seguro" e "Filmes e séries • TV ao vivo • Onde você estiver"), o título de chamada perde um
+   pouco de corpo e os cartazes ficam com a altura que sobrar.
+
+   Tudo é medido em função da altura ÚTIL da tela (--u), porque a largura do celular é sempre
+   parecida e o que muda de um aparelho para outro é a altura. Os números saíram de medição em
+   oito telas, de 640 a 932 px. O campo de texto fica em 16 px de propósito: abaixo disso o
+   iPhone dá zoom na página ao tocar no campo. */
 @media (max-width: 799px){
   /* 1% da altura ÚTIL: a tela menos o entalhe em cima e a barra de gestos embaixo. Com `svh`
      puro a conta fechava no Android e estourava ~30 px no iPhone, que perde 93 px para os dois. */
@@ -1027,32 +1034,30 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
   .login-tela .page-shell{
     padding-top: max(10px, env(safe-area-inset-top));
     padding-bottom: max(8px, env(safe-area-inset-bottom)); }
-  .login-tela .main-layout{ gap: clamp(10px, calc(1.9 * var(--u)), 20px); padding: clamp(8px, calc(1.6 * var(--u)), 18px) 0 clamp(6px, calc(1.2 * var(--u)), 14px); }
+  .login-tela .main-layout{ gap: clamp(10px, calc(2 * var(--u)), 20px); padding: clamp(8px, calc(1.5 * var(--u)), 16px) 0 clamp(6px, calc(1 * var(--u)), 12px); }
 
-  .login-tela .login-card{ border-radius: 22px; }
-  .login-tela .login-card-content{ padding: clamp(12px, calc(1.9 * var(--u)), 20px) 22px clamp(10px, calc(1.6 * var(--u)), 16px); }
-  .login-tela .login-play{ width: 22px; height: 22px; margin: 0 auto 2px; }
-  .login-tela .login-card h2{ font-size: clamp(21px, calc(3 * var(--u)), 27px); }
-  .login-tela .login-subtitle{ font-size: 14px; margin: 2px 0 clamp(8px, calc(1.4 * var(--u)), 14px); }
-  .login-tela .field + .field{ margin-top: clamp(7px, calc(1.1 * var(--u)), 12px); }
-  .login-tela .field > label{ font-size: 13px; margin-bottom: 4px; }
-  .login-tela .input-wrap{ min-height: clamp(40px, calc(4.9 * var(--u)), 46px); }
-  .login-tela .input-wrap input{ padding-block: 6px; font-size: 16px; }
-  .login-tela .form-options{ margin: clamp(8px, calc(1.3 * var(--u)), 13px) 0 clamp(9px, calc(1.5 * var(--u)), 15px); }
-  .login-tela .remember{ min-height: 24px; }
-  .login-tela .remember input{ width: 20px; height: 20px; }
-  .login-tela .submit-button{ min-height: clamp(44px, calc(5.3 * var(--u)), 50px); font-size: 17px; }
-  .login-tela .signup-line{ margin-top: clamp(8px, calc(1.3 * var(--u)), 14px); font-size: 13px; }
-  .login-tela .secure-note{ margin-top: clamp(5px, calc(1 * var(--u)), 11px); font-size: 12px; }
-  .login-tela .secure-note .icon{ width: 16px; height: 16px; }
+  .login-tela .login-card{ border-radius: 25px; }
+  .login-tela .login-card-content{ padding: clamp(14px, calc(2.6 * var(--u)), 26px) 26px clamp(13px, calc(2.3 * var(--u)), 22px); }
+  .login-tela .login-play{ width: clamp(22px, calc(3.3 * var(--u)), 30px); height: clamp(22px, calc(3.3 * var(--u)), 30px); margin: 0 auto 4px; }
+  .login-tela .login-card h2{ font-size: clamp(23px, calc(3.6 * var(--u)), 32px); }
+  .login-tela .login-subtitle{ font-size: clamp(14px, calc(1.95 * var(--u)), 17px); margin: 4px 0 clamp(9px, calc(1.9 * var(--u)), 18px); }
+  .login-tela .field + .field{ margin-top: clamp(8px, calc(1.5 * var(--u)), 13px); }
+  .login-tela .field > label{ font-size: 14px; margin-bottom: clamp(4px, calc(.7 * var(--u)), 6px); }
+  .login-tela .input-wrap{ min-height: clamp(42px, calc(5.5 * var(--u)), 46px); }
+  .login-tela .input-wrap input{ padding-block: 7px; font-size: 16px; }
+  .login-tela .form-options{ margin: clamp(9px, calc(1.6 * var(--u)), 14px) 0 clamp(10px, calc(1.9 * var(--u)), 16px); }
+  .login-tela .submit-button{ min-height: clamp(46px, calc(5.9 * var(--u)), 50px); }
+  .login-tela .signup-line{ margin-top: clamp(10px, calc(1.9 * var(--u)), 16px); font-size: 14px; }
   .login-tela .form-feedback{ margin: -4px 0 12px; padding: 8px 10px; font-size: 13px; }
+  /* As duas linhas pequenas que saem para o resto poder ficar grande. */
+  .login-tela .secure-note{ display: none; }
+  .login-tela .benefits{ display: none; }
 
-  .login-tela .welcome h1{ font-size: clamp(22px, calc(3.3 * var(--u)), 32px); margin-bottom: clamp(4px, calc(.8 * var(--u)), 8px); }
-  .login-tela .welcome-subtitle{ font-size: clamp(13px, calc(1.65 * var(--u)), 15px); line-height: 1.35; }
-  .login-tela .benefits{ margin-top: clamp(5px, calc(.9 * var(--u)), 10px); font-size: 11px; gap: 4px 0; }
+  .login-tela .welcome h1{ font-size: clamp(24px, calc(3.7 * var(--u)), 36px); margin-bottom: clamp(4px, calc(.9 * var(--u)), 10px); }
+  .login-tela .welcome-subtitle{ font-size: clamp(14px, calc(1.95 * var(--u)), 17px); line-height: 1.35; }
   /* Os cartazes ficam com a altura que sobra: a largura da fileira é limitada pela altura da
      tela, e cada cartaz tem proporção fixa. Em tela alta eles crescem; em tela baixa, encolhem. */
-  .login-tela .catalogue{ margin: clamp(8px, calc(1.5 * var(--u)), 16px) auto 0; max-width: min(100%, calc(30 * var(--u) + 3 * var(--vao-cartaz))); }
+  .login-tela .catalogue{ margin: clamp(8px, calc(1.6 * var(--u)), 16px) auto 0; max-width: min(100%, calc(28 * var(--u) + 3 * var(--vao-cartaz))); }
   .login-tela .catalogue-controls{ margin-top: 4px; min-height: 30px; }
   .login-tela .icon-button{ width: 30px; height: 30px; }
   .login-tela .catalogue-dots button{ width: 26px; height: 30px; }
@@ -1064,7 +1069,14 @@ body.tv .avatar.g{ width: 150px; height: 150px; font-size: 54px; }
 /* Tela alta (iPhone Pro Max, Android grande, tablet em pé): sobra altura, e ela vai para os
    cartazes em vez de virar um vão vazio em cima do rodapé. */
 @media (max-width: 799px) and (min-height: 880px){
-  .login-tela .catalogue{ max-width: min(100%, calc(40 * var(--u) + 3 * var(--vao-cartaz))); }
+  .login-tela .catalogue{ max-width: min(100%, calc(41 * var(--u) + 3 * var(--vao-cartaz))); }
+}
+/* Celular estreito (360 px): com o recuo lateral cheio, "Lembrar de mim" e "Esqueci minha
+   senha" não cabem na mesma linha, quebram em duas e o cartão cresce 28 px à toa. */
+@media (max-width: 379px){
+  .login-tela .login-card-content{ padding-inline: 20px; }
+  .login-tela .form-options{ font-size: 11.5px; gap: 7px; }
+  .login-tela .signup-line{ font-size: 13px; }
 }
 /* Tela baixa (iPhone SE, Android pequeno, ou o Safari com as barras abertas): não cabe
    formulário, chamada e cartazes. O formulário é a função da tela e a chamada é a marca; os
