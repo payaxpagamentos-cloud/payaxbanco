@@ -292,26 +292,29 @@ export async function tocar({ tipo, canal_id: canalId, titulo_id: tituloId, epis
     // continuar enquanto a rede falha. Eram 20 s para tudo; no ao vivo passa a 60 s, que é o
     // que a janela da lista permite guardar.
     //
-    // `liveSyncDurationCount` é a quantos pedaços da ponta o player se mantém. Em 3 (o padrão)
-    // ele fica colado no ao vivo e qualquer atraso o alcança; em 5 fica uns 20 s atrás, com
-    // esses 20 s inteiros de folga para absorver oscilação. É a troca que a operação pediu: um
-    // pouco mais de atraso em relação ao ar, em nome de não travar.
+    // A distância da ponta é o segundo ajuste (ver `liveSyncDuration` abaixo): no padrão do
+    // hls.js o player fica colado no ao vivo e qualquer atraso o alcança; a 20 s, ele tem esses
+    // 20 s inteiros de folga para absorver oscilação. É a troca que a operação pediu: um pouco
+    // mais de atraso em relação ao ar, em nome de não travar.
     //
-    // Medido com a origem cortada no meio da transmissão: com os 20 s de antes o canal ficava
-    // 14 s na tela depois da queda; com estes, 21 s (test/e2e, origem de 4 s por pedaço).
+    // Medido com a origem cortada no meio da transmissão: com os 20 s de buffer de antes o canal
+    // ficava 14 s na tela depois da queda; com estes, 21 s.
     //
-    // Canal de TV não é videochamada: ninguém percebe meio minuto de atraso, e todo mundo
+    // Canal de TV não é videochamada: ninguém percebe vinte segundos de atraso, e todo mundo
     // percebe a imagem congelando.
     hls = new H({
       lowLatencyMode: aoVivo,
       enableWorker: true,
       backBufferLength: aoVivo ? 30 : 90,
       maxBufferLength: aoVivo ? 60 : 20,
-      // 5 pedaços da ponta: com os 4s do servidor, são 20s de vídeo já guardados adiantado, e
-      // ainda sobram 3 pedaços de margem antes de a janela da lista (8) deixar a posição para
-      // trás. O teto de atraso acompanha a janela — passar disso seria pedir pedaço que a lista
-      // não tem mais, e aí o player salta para o ao vivo em vez de insistir no vazio.
-      ...(aoVivo ? { liveSyncDurationCount: 5, liveMaxLatencyDurationCount: 8 } : {}),
+      // A que distância da ponta o player se mantém, em SEGUNDOS: 20 s atrás do ao vivo, com
+      // teto de 30. Antes isto era contado em pedaços (5 e 8), e a conta só fechava enquanto
+      // todo pedaço tivesse 4 s — com os pedaços iniciais de 2 s de um canal recém-ligado,
+      // "5 pedaços" viravam 10 s e o player ia para mais perto da ponta justamente na hora em
+      // que a folga é menor. Em segundos, a distância é a mesma seja qual for o pedaço.
+      // O teto fica abaixo da janela da lista (8 pedaços de 4 s = 32 s): passar dela seria
+      // pedir pedaço que o servidor já apagou.
+      ...(aoVivo ? { liveSyncDuration: 20, liveMaxLatencyDuration: 30 } : {}),
     });
     hls.on(H.Events.ERROR, (_e, info) => {
       if (!info.fatal) return;

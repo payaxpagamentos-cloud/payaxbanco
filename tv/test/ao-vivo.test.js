@@ -288,9 +288,9 @@ test('o canal só é entregue com folga de buffer, não no primeiro pedaço', as
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'play-tech-vip-folga-'));
   t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
 
-  const lista = (quantos) => [
+  const lista = (quantos, segundos = 4) => [
     '#EXTM3U', '#EXT-X-VERSION:3', '#EXT-X-TARGETDURATION:4', '#EXT-X-MEDIA-SEQUENCE:0',
-    ...Array.from({ length: quantos }, (_, i) => `#EXTINF:4.000,\np${String(i).padStart(6, '0')}.ts`),
+    ...Array.from({ length: quantos }, (_, i) => `#EXTINF:${segundos.toFixed(3)},\np${String(i).padStart(6, '0')}.ts`),
     '',
   ].join('\n');
 
@@ -305,19 +305,34 @@ test('o canal só é entregue com folga de buffer, não no primeiro pedaço', as
   assert.equal(aovivo.pedacosNaLista(7), 0);
   assert.equal(aovivo.daParaAssistir(7), false);
 
-  // Um e dois pedaços: HÁ sinal, mas ainda não dá para assistir sem travar. É a distinção que
-  // faltava — "tem sinal" e "dá para assistir" não são a mesma coisa.
-  for (const n of [1, 2]) {
-    fs.writeFileSync(arquivo, lista(n));
+  // A regra é em SEGUNDOS de vídeo na lista (8), com um mínimo de dois pedaços. Antes era
+  // "três pedaços", o que com pedaço de 4 s dava 12 s de espera e com pedaço de 8 s dava 24.
+
+  // Um pedaço só: HÁ sinal, mas não dá para assistir sem travar — nem quando ele sozinho já
+  // tem os 8 s. O player ficaria na ponta, esperando o pedaço seguinte nascer inteiro.
+  // "Tem sinal" e "dá para assistir" não são a mesma coisa.
+  for (const [n, s] of [[1, 4], [1, 8], [1, 10]]) {
+    fs.writeFileSync(arquivo, lista(n, s));
     assert.equal(aovivo.pedacosNaLista(7), n);
-    assert.equal(aovivo.temSinal(7), true, `com ${n} pedaço(s) já há sinal`);
-    assert.equal(aovivo.daParaAssistir(7), false, `com ${n} pedaço(s) o player travaria`);
+    assert.equal(aovivo.temSinal(7), true, 'com um pedaço já há sinal');
+    assert.equal(aovivo.daParaAssistir(7), false, `um pedaço de ${s} s não basta`);
   }
 
-  // Três pedaços são os 12s que o hls.js procura (liveSyncDurationCount: 3) e o que o HLS
-  // recomenda: começar a tocar a três pedaços da ponta.
-  fs.writeFileSync(arquivo, lista(3));
+  // Pedaços iniciais de 2 s (os de um canal que acabou de ligar): três são 6 s, falta; quatro
+  // são 8 s, entrega.
+  fs.writeFileSync(arquivo, lista(3, 2));
+  assert.equal(aovivo.daParaAssistir(7), false, 'três pedaços de 2 s são só 6 s');
+  fs.writeFileSync(arquivo, lista(4, 2));
+  assert.equal(aovivo.daParaAssistir(7), true, 'quatro pedaços de 2 s são os 8 s');
+
+  // Pedaços de regime de 4 s: dois já são 8 s.
+  fs.writeFileSync(arquivo, lista(2, 4));
   assert.equal(aovivo.daParaAssistir(7), true);
+
+  // Origem de quadro-chave espaçado (pedaço de 8 s): dois pedaços, e não três.
+  fs.writeFileSync(arquivo, lista(2, 8));
+  assert.equal(aovivo.daParaAssistir(7), true);
+  assert.deepEqual(aovivo.resumoDaLista(7), { pedacos: 2, segundos: 16, maior: 8 });
 
   // Só conta pedaço de verdade: comentário e cabeçalho não viram folga.
   fs.writeFileSync(arquivo, '#EXTM3U\n#EXT-X-TARGETDURATION:4\n# p000000.ts\n');
@@ -510,4 +525,81 @@ test('fechou a tela, os pedaços param de sair — mesmo com o token ainda váli
   const lista2 = await s.req('GET', denovo.dados.fonte.url.replace(/^.*\/api/, ''));
   const pedaco2 = String(lista2.dados).split('\n').filter((l) => l && !l.startsWith('#')).pop().replace(/^.*\/api/, '');
   assert.equal((await s.req('GET', pedaco2)).status, 200);
+});
+
+test('a partida usa análise curta e pedaços iniciais menores; a lista entregue tem alvo estável', async (t) => {
+  // O ffmpeg de mentira não lê os argumentos, então aqui se confere o que a plataforma PEDE a
+  // ele. O efeito de verdade foi medido com ffmpeg real e um sinal SRT: 13,7 s -> 9,7 s num
+  // sinal limpo, e ~10 s a menos num sinal com faixa que não manda dados.
+  const s = await iniciar();
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
+  const admin = await s.adminLogin();
+  const canal = (await s.post('/admin/canais', {
+    numero: 78, nome: 'PLAY Partida', fonte: 'rtmp', url_hls: 'rtmp://origem.interna/live/partida',
+  }, admin)).dados.canal;
+  const cliente = await s.assinante('partida@exemplo.com.br', { plano: 2 });
+  const abrir = await s.post('/play/abrir', { tipo: 'canal', canal_id: canal.id }, cliente.token, cliente.comPerfil);
+  assert.equal(abrir.status, 201, JSON.stringify(abrir.dados));
+
+  // A lista que o player recebe declara o alvo de regime, não o do pedaço inicial.
+  const m3u8 = await s.req('GET', abrir.dados.fonte.url.replace(/^.*\/api/, ''));
+  assert.match(m3u8.dados, new RegExp(`#EXT-X-TARGETDURATION:${Math.max(4, Math.ceil(config.aoVivo.segundosPorSegmento))}\\b`));
+
+  // O cronômetro da partida chega ao painel.
+  const ate = Date.now() + 4000;
+  let doPainel;
+  while (Date.now() < ate) {
+    doPainel = (await s.get('/admin/canais', admin)).dados.canais.find((c) => c.id === canal.id);
+    if (doPainel.ao_vivo.partida?.pronto_ms != null) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.equal(doPainel.ao_vivo.partida.analise, 'curta');
+  assert.ok(doPainel.ao_vivo.partida.primeiro_ms >= 0);
+  assert.ok(doPainel.ao_vivo.partida.pronto_ms >= doPainel.ao_vivo.partida.primeiro_ms);
+  assert.ok(doPainel.ao_vivo.partida.pedaco_s > 0);
+});
+
+test('canais mais assistidos ficam quentes sozinhos, e os marcados à mão têm prioridade', async (t) => {
+  const s = await iniciar();
+  t.after(async () => { await aovivo.desligarTudo(); await s.fechar(); });
+  const admin = await s.adminLogin();
+  const cliente = await s.assinante('quentes@exemplo.com.br', { plano: 2 });
+  const criar = async (numero, nome) => (await s.post('/admin/canais', {
+    numero, nome, fonte: 'rtmp', url_hls: `rtmp://origem.interna/live/c${numero}`,
+  }, admin)).dados.canal;
+  const muito = await criar(81, 'Muito Visto');
+  const pouco = await criar(82, 'Pouco Visto');
+  const antigo = await criar(83, 'Visto Há Um Mês');
+  const manual = await criar(84, 'Marcado à Mão');
+
+  const agora = new Date().toISOString();
+  const haUmMes = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const ins = s.db.prepare("INSERT INTO sessoes_player (usuario_id,perfil_id,tipo,canal_id,iniciada_em,ultimo_ping,encerrada_em) VALUES (?,?,'canal',?,?,?,?)");
+  const abrir = (canal, vezes, quando = agora) => { for (let i = 0; i < vezes; i += 1) ins.run(cliente.usuario.id, cliente.perfilId, canal.id, quando, quando, quando); };
+  abrir(muito, 40);
+  abrir(pouco, 2);            // abaixo do mínimo: não vale manter convertendo o dia inteiro
+  abrir(antigo, 90, haUmMes); // muita audiência, mas fora dos sete dias
+
+  const antes = { auto: config.aoVivo.quentesAutomaticos, manuais: config.aoVivo.quentes };
+  config.aoVivo.quentesAutomaticos = 10;
+  config.aoVivo.quentes = [84];
+  t.after(() => { config.aoVivo.quentesAutomaticos = antes.auto; config.aoVivo.quentes = antes.manuais; });
+
+  // A conta fica guardada por meia hora (criar os canais acima já a fez, com a audiência ainda
+  // vazia). Aqui ela é refeita na hora; em produção, espera a próxima meia hora.
+  assert.deepEqual(aovivo.maisVistos(s.db, 10, { refazer: true }), [muito.id]);
+  const canais = s.db.prepare("SELECT id, numero, nome, url_hls, sinal_video, sinal_audio, melhoria FROM canais WHERE fonte = 'rtmp' ORDER BY numero").all();
+  // O marcado à mão vem primeiro: se o teto apertar, é a escolha da operação que fica.
+  assert.deepEqual(aovivo.canaisQuentes(canais, s.db).map((c) => c.nome), ['Marcado à Mão', 'Muito Visto']);
+
+  // A sincronização liga os dois sem ninguém ter aberto, e a limpeza de ociosos não os desliga.
+  aovivo.sincronizar(s.db);
+  assert.equal(aovivo.situacao(muito.id).convertendo, true);
+  assert.equal(aovivo.situacao(manual.id).convertendo, true);
+  assert.equal(aovivo.situacao(pouco.id).convertendo, false);
+  assert.equal(aovivo.situacao(muito.id).quente, true);
+
+  // Desligado (zero), só valem os marcados à mão.
+  config.aoVivo.quentesAutomaticos = 0;
+  assert.deepEqual(aovivo.canaisQuentes(canais, s.db).map((c) => c.nome), ['Marcado à Mão']);
 });

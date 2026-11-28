@@ -387,6 +387,9 @@ CREATE INDEX IF NOT EXISTS idx_sessoes_audiencia ON sessoes_player(iniciada_em);
 -- mil sessões guardadas, crescendo junto com o histórico. As abertas são sempre poucas (quem
 -- está assistindo agora), então o índice é minúsculo e a busca não depende mais do passado.
 CREATE INDEX IF NOT EXISTS idx_sessoes_abertas ON sessoes_player(ultimo_ping) WHERE encerrada_em IS NULL;
+-- Só as sessões de canal ao vivo, com o canal junto: é a conta de "quais canais são os mais
+-- vistos", que decide quais ficam quentes. Feita uma vez a cada meia hora, sem ir à tabela.
+CREATE INDEX IF NOT EXISTS idx_sessoes_canal ON sessoes_player(iniciada_em, canal_id) WHERE canal_id IS NOT NULL;
 -- Só as sessões de filme e série, já com o título junto: é o que "Em alta" e "populares" contam.
 -- Canal ao vivo é a maior parte do histórico e não entra aqui, então o índice fica pequeno e a
 -- contagem não precisa ir à tabela.

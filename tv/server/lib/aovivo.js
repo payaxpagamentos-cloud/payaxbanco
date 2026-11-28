@@ -130,6 +130,13 @@ const NOME_PEDACO = /^p\d{6}\.ts$/;
 
 /** Estado por canal: processo, tentativas, último erro. Só em memória — reinício recomeça limpo. */
 const vivos = new Map();
+// A última partida de cada canal (mesmo depois de ele esfriar): quando ligou, com que análise,
+// quanto levou até o primeiro pedaço e até poder ser entregue. É o que o painel mostra.
+const partidas = new Map();
+// Canais cujo sinal não se deixou ler pela análise curta: sobem direto com a completa.
+const semAnaliseRapida = new Set();
+// Canais mantidos quentes pela audiência (ver `maisVistos`), refeito a cada sincronização.
+let quentesPorAudiencia = new Set();
 
 /** Espera entre reconexões: 2s, 4s, 8s… até 60s. */
 const esperaDaTentativa = (n) => Math.min(2000 * (2 ** Math.max(0, n - 1)), 60_000);
@@ -218,6 +225,13 @@ function ligar(canal, db) {
   limparPasta(canal.id);
   fs.mkdirSync(pastaDoCanal(canal.id), { recursive: true });
 
+  // Análise curta só na primeira tentativa, e só em canal que nunca precisou da completa.
+  // Se ela não bastar para este sinal, o ffmpeg morre na hora (não acha a taxa do áudio, por
+  // exemplo) e a tentativa seguinte, logo abaixo no `exit`, sobe com a análise de sempre.
+  const rapida = config.aoVivo.analiseRapida && estado.tentativas === 0 && !semAnaliseRapida.has(canal.id);
+  const iniciais = config.aoVivo.segundosIniciais;
+  partidas.set(canal.id, { em: Date.now(), analise: rapida ? 'curta' : 'completa', primeiro_ms: null, pronto_ms: null, pedaco_s: null });
+
   const args = [
     '-hide_banner', '-loglevel', 'warning',
     // Sobrescreve a lista de uma execução anterior. Sem isto o ffmpeg pergunta no terminal e,
@@ -225,6 +239,10 @@ function ligar(canal, db) {
     '-y',
     // Silêncio da origem por este tempo: o processo cai e a reconexão entra em ação.
     '-rw_timeout', String(config.aoVivo.timeoutMs * 1000),   // em microssegundos
+    // Quanto do sinal ler antes de começar a gravar (ver `analiseRapida` em config.js): 1 MB
+    // ou 2 s, o que vier primeiro. Num canal de 3 a 6 Mbps isso é 1,5 a 3 s de vídeo — cabe
+    // um quadro-chave e os primeiros quadros de áudio, que é o que o ffmpeg precisa conhecer.
+    ...(rapida ? ['-analyzeduration', '2000000', '-probesize', '1000000'] : []),
     '-i', canal.url_hls,
     // Só vídeo e áudio: dado e legenda embutidos de alguns sinais não cabem em MPEG-TS e
     // derrubariam a conversão no meio.
@@ -235,6 +253,8 @@ function ligar(canal, db) {
     '-fflags', '+genpts',
     '-f', 'hls',
     '-hls_time', String(config.aoVivo.segundosPorSegmento),
+    // Os primeiros pedaços saem menores, até a primeira lista encher; depois valem os de regime.
+    ...(iniciais > 0 && iniciais < config.aoVivo.segundosPorSegmento ? ['-hls_init_time', String(iniciais)] : []),
     '-hls_list_size', String(config.aoVivo.segmentosNaLista),
     // delete_segments apaga o que saiu da lista; omit_endlist mantém a lista como "ao vivo".
     '-hls_flags', 'delete_segments+omit_endlist+temp_file',
@@ -264,9 +284,19 @@ function ligar(canal, db) {
     if (estado.parando) return;
     estado.tentativas += 1;
     const ultima = ultimasLinhas.trim().split('\n').filter(Boolean).pop();
-    estado.erro = `a conversão parou (${sinal ?? `código ${codigo}`})${ultima ? `: ${ultima}` : ''}`;
-    if (db) anotar(db, canal.id, 'falha', estado.erro);
-    const espera = esperaDaTentativa(estado.tentativas);
+    // Plano B da análise curta: caiu antes de gravar qualquer pedaço. Não é falha do canal —
+    // é este sinal precisando de mais leitura. Sobe de novo em seguida com a análise completa,
+    // sem acusar erro para o assinante que está esperando nem marcar o canal no painel, e
+    // lembra do canal para não repetir a tentativa perdida nas próximas aberturas.
+    const planoB = rapida && !temSinal(canal.id);
+    if (planoB) {
+      semAnaliseRapida.add(canal.id);
+      estado.erro = null;
+    } else {
+      estado.erro = `a conversão parou (${sinal ?? `código ${codigo}`})${ultima ? `: ${ultima}` : ''}`;
+      if (db) anotar(db, canal.id, 'falha', estado.erro);
+    }
+    const espera = planoB ? 250 : esperaDaTentativa(estado.tentativas);
     estado.proxima = new Date(Date.now() + espera).toISOString();
     estado.relogio = setTimeout(() => {
       // O canal pode ter sido desligado ou apagado enquanto a gente esperava.
@@ -285,15 +315,26 @@ function ligar(canal, db) {
     // isso a confirmação fica olhando, em vez de confiar no instante em que o processo nasceu.
     clearInterval(estado.confirmacao);
     const nasceu = Date.now();
-    let tentativas = 0;
+    let confirmado = false;
     estado.confirmacao = setInterval(() => {
-      tentativas += 1;
-      if (!estado.processo || tentativas > 120) return clearInterval(estado.confirmacao);
-      if (Date.now() - nasceu < 1500 || !temSinal(canal.id)) return undefined;
-      clearInterval(estado.confirmacao);
-      if (db) anotar(db, canal.id, 'ok', 'Conectado na origem, convertendo para HLS.');
+      // Um minuto e meio é mais que qualquer partida saudável; passou disso, para de olhar.
+      if (!estado.processo || Date.now() - nasceu > 90_000) return clearInterval(estado.confirmacao);
+      const p = partidas.get(canal.id);
+      const r = resumoDaLista(canal.id);
+      // O cronômetro da partida: quanto levou até o primeiro pedaço (conexão + análise do sinal
+      // + o primeiro pedaço em si) e até o canal poder ser entregue. É o que diz, no painel, se
+      // a demora de um canal está na origem ou na espera dos pedaços.
+      if (p && r.pedacos >= 1 && p.primeiro_ms === null) p.primeiro_ms = Date.now() - p.em;
+      if (!confirmado && Date.now() - nasceu >= 1500 && r.pedacos >= 1) {
+        confirmado = true;
+        if (db) anotar(db, canal.id, 'ok', 'Conectado na origem, convertendo para HLS.');
+      }
+      if (daParaAssistir(canal.id)) {
+        if (p && p.pronto_ms === null) { p.pronto_ms = Date.now() - p.em; p.pedaco_s = Number((r.segundos / r.pedacos).toFixed(1)); }
+        if (confirmado) clearInterval(estado.confirmacao);
+      }
       return undefined;
-    }, 500);
+    }, 250);
     if (estado.confirmacao.unref) estado.confirmacao.unref();
   });
 
@@ -352,6 +393,10 @@ function desligar(id) {
 function desligarTudo({ esperarMs = 5000 } = {}) {
   const processos = [...vivos.values()].map((e) => e.processo).filter(Boolean);
   for (const id of [...vivos.keys()]) desligar(id);
+  // Desligou tudo: o que se sabia sobre partidas e canais quentes não vale para a próxima subida.
+  partidas.clear();
+  semAnaliseRapida.clear();
+  quentesPorAudiencia = new Set();
   if (!processos.length) return Promise.resolve();
   return Promise.race([
     Promise.all(processos.map((p) => (p.exitCode !== null || p.signalCode !== null
@@ -384,7 +429,7 @@ function sincronizar(db) {
     //
     // A exceção são os canais quentes: os mais vistos ficam convertendo sempre, para abrirem na
     // hora em vez de fazer o assinante esperar o canal subir toda vez que ele esfria.
-    const quentes = canaisQuentes(canais);
+    const quentes = canaisQuentes(canais, db);
     for (const c of quentes) if (!vivos.has(c.id)) ligar(c, db);
     limparOciosos();
     return { ligados: vivos.size, limitados: 0, sob_demanda: true, quentes: quentes.length };
@@ -406,20 +451,57 @@ function marcarUso(id) {
 
 /** Desliga quem ninguém está assistindo há mais do que o tempo de folga. */
 /** Os canais marcados para ficar sempre quentes, dentro do teto de memória. */
-function canaisQuentes(canais) {
-  if (!config.aoVivo.quentes.length) return [];
+/**
+ * Os canais mais assistidos dos últimos sete dias, do mais visto para o menos.
+ *
+ * É o que decide quais ficam quentes sozinhos. A conta é refeita a cada meia hora e fica
+ * guardada por banco: audiência de uma semana não muda de um minuto para o outro, e a
+ * sincronização dos canais roda a cada 30 segundos.
+ *
+ * Canal aberto meia dúzia de vezes na semana não entra: manter um canal convertendo o dia
+ * inteiro só se paga quando há gente de verdade abrindo.
+ */
+const MINIMO_DE_ABERTURAS = 5;
+const audienciaGuardada = new WeakMap();   // db -> { em, ids }
+function maisVistos(db, quantos = config.aoVivo.quentesAutomaticos, { refazer = false } = {}) {
+  if (!db || quantos <= 0) return [];
+  const tem = audienciaGuardada.get(db);
+  if (!refazer && tem && Date.now() - tem.em < 30 * 60_000) return tem.ids.slice(0, quantos);
+  let ids = [];
+  try {
+    ids = db.prepare(`SELECT canal_id, COUNT(*) AS n FROM sessoes_player
+      WHERE canal_id IS NOT NULL AND iniciada_em >= ? GROUP BY canal_id HAVING n >= ? ORDER BY n DESC, canal_id LIMIT 60`)
+      .all(new Date(Date.now() - 7 * 86_400_000).toISOString(), MINIMO_DE_ABERTURAS).map((x) => x.canal_id);
+  } catch { /* banco fechando ou ainda sem a tabela: sem audiência, sem canal quente */ }
+  audienciaGuardada.set(db, { em: Date.now(), ids });
+  return ids.slice(0, quantos);
+}
+
+/**
+ * Os canais que ficam convertendo sempre: os que a operação marcou (TV_AO_VIVO_QUENTES) e os
+ * mais assistidos (TV_AO_VIVO_QUENTES_AUTO). Os marcados à mão vêm primeiro — se o teto
+ * apertar, é a escolha da operação que fica.
+ */
+function canaisQuentes(canais, db = null) {
   const numeros = new Set(config.aoVivo.quentes);
+  const porAudiencia = maisVistos(db);
+  const ordem = new Map(porAudiencia.map((id, i) => [id, i]));
+  const manuais = canais.filter((c) => numeros.has(c.numero));
+  const automaticos = canais.filter((c) => ordem.has(c.id) && !numeros.has(c.numero)).sort((a, b) => ordem.get(a.id) - ordem.get(b.id));
   // O teto vale para eles também: canal quente não pode comer a memória toda e deixar o
   // assinante que abriu um canal qualquer sem lugar.
-  return canais.filter((c) => numeros.has(c.numero)).slice(0, Math.max(0, config.aoVivo.maxCanais - 5));
+  const escolhidos = [...manuais, ...automaticos].slice(0, Math.max(0, config.aoVivo.maxCanais - 5));
+  quentesPorAudiencia = new Set(escolhidos.filter((c) => !numeros.has(c.numero)).map((c) => c.id));
+  return escolhidos;
 }
 
 /** Os ids que estão sempre quentes agora. Usado para não desligá-los por ociosidade. */
 function idsQuentes() {
-  if (!config.aoVivo.quentes.length) return new Set();
   const numeros = new Set(config.aoVivo.quentes);
   const ids = new Set();
-  for (const [id, e] of vivos) if (e.numero !== undefined && numeros.has(e.numero)) ids.add(id);
+  for (const [id, e] of vivos) {
+    if ((e.numero !== undefined && numeros.has(e.numero)) || quentesPorAudiencia.has(id)) ids.add(id);
+  }
   return ids;
 }
 
@@ -500,7 +582,23 @@ function pedacosNaLista(id) {
 }
 
 /** Já há vídeo suficiente na lista para o player começar com folga? */
-const daParaAssistir = (id) => pedacosNaLista(id) >= config.aoVivo.pedacosParaComecar;
+/** Quantos pedaços a lista tem agora, quantos segundos eles somam e o maior deles. */
+function resumoDaLista(id) {
+  let texto;
+  try { texto = fs.readFileSync(listaDoCanal(id), 'utf8'); } catch { return { pedacos: 0, segundos: 0, maior: 0 }; }
+  const pedacos = (texto.match(/^p\d{6}\.ts$/gm) ?? []).length;
+  const duracoes = (texto.match(/^#EXTINF:[\d.]+/gm) ?? []).map((l) => Number(l.slice(8)) || 0);
+  return { pedacos, segundos: duracoes.reduce((a, b) => a + b, 0), maior: Math.max(0, ...duracoes) };
+}
+
+/**
+ * O canal já pode ser entregue? Vale o que a lista tem em SEGUNDOS, com um mínimo de pedaços
+ * (ver `segundosParaComecar` em config.js).
+ */
+const daParaAssistir = (id) => {
+  const r = resumoDaLista(id);
+  return r.pedacos >= config.aoVivo.pedacosParaComecar && r.segundos >= config.aoVivo.segundosParaComecar;
+};
 
 /** Lê a lista HLS que o ffmpeg está escrevendo e aponta cada pedaço para o nosso endereço. */
 function listaDoPlayer(canalId, { playToken, baseApi }) {
@@ -511,8 +609,15 @@ function listaDoPlayer(canalId, { playToken, baseApi }) {
     throw new ErroNegocio('Este canal está entrando no ar. Tente de novo em alguns segundos.', 503, { motivo: 'aquecendo' });
   }
   const rota = `${baseApi}/play/canal/${canalId}/pedaco`;
+  // A duração-alvo não pode mudar no meio de uma transmissão, e o ffmpeg a escreve pelo maior
+  // pedaço visto ATÉ ALI: com os pedaços iniciais menores, ela começaria em 2 e viraria 4 um
+  // pouco depois. O hls.js tolera; o player nativo do iPhone não tem por que tolerar. Então a
+  // lista entregue declara desde o começo o tamanho de regime (pedaço menor que o alvo é
+  // válido), ou o que o ffmpeg mediu, se a origem estiver mandando pedaços maiores que isso.
+  const alvo = Math.ceil(config.aoVivo.segundosPorSegmento);
   return texto.split(/\r?\n/).map((linha) => {
     const l = linha.trim();
+    if (l.startsWith('#EXT-X-TARGETDURATION:')) return `#EXT-X-TARGETDURATION:${Math.max(alvo, Number(l.slice(22)) || 0)}`;
     if (!l || l.startsWith('#')) return linha;
     return `${rota}/${l}?t=${encodeURIComponent(playToken)}`;
   }).join('\n');
@@ -609,13 +714,16 @@ function situacao(id) {
     tentativas: e?.tentativas ?? 0,
     erro: e?.erro ?? null,
     proxima_tentativa: e?.proxima ?? null,
+    // A última partida deste canal, mesmo que ele já tenha esfriado: quanto demorou e por quê.
+    partida: partidas.get(id) ?? null,
+    quente: idsQuentes().has(id),
   };
 }
 
 module.exports = {
   PROTOCOLOS, VIDEO_COPIAVEL, AUDIO_COPIAVEL, MELHORIAS, modoDeConversao,
   conferirEndereco, conferir, ligar, desligar, desligarTudo, sincronizar, situacao, temSinal,
-  pedacosNaLista, daParaAssistir,
+  pedacosNaLista, resumoDaLista, daParaAssistir, maisVistos, canaisQuentes, partidas,
   garantir, marcarUso, limparOciosos,
   listaDoPlayer, caminhoDoPedaco, pastaDoCanal, listaDoCanal,
 };

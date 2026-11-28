@@ -377,6 +377,25 @@ async function telaCanais(c) {
       el('strong', {}, `chega em ${m[1]}x${m[2]}`), ` (${faixa})`, tratado);
   };
 
+  /**
+   * Quanto o canal levou para entrar no ar na última vez que ligou, e onde o tempo foi gasto.
+   *
+   * "1º pedaço" é a origem: conectar, o ffmpeg conhecer o sinal e gravar o primeiro trecho.
+   * O resto, até "no ar", é a espera pelos segundos de folga. Se o primeiro número for alto,
+   * a demora está no sinal do fornecedor (ou o canal precisou da análise completa); se for
+   * baixo e o total alto, está no tamanho do pedaço. É o que responde "por que este canal
+   * demora?" sem ninguém precisar abrir o servidor.
+   */
+  const partidaDoCanal = (x) => {
+    const p = x.ao_vivo?.partida;
+    const quente = x.ao_vivo?.quente ? el('span', { class: 'etiqueta info', style: 'margin-right:6px', title: 'Fica convertendo sempre e abre na hora' }, 'sempre quente') : null;
+    if (!p || p.pronto_ms == null) return quente ? el('div', { class: 'mini apagado', style: 'margin-top:3px' }, quente) : null;
+    const s = (ms) => (ms / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+    return el('div', { class: 'mini apagado', style: 'margin-top:3px' }, quente,
+      `entrou no ar em ${s(p.pronto_ms)} s (1º pedaço em ${s(p.primeiro_ms ?? p.pronto_ms)} s, pedaços de ${String(p.pedaco_s).replace('.', ',')} s`
+      + `${p.analise === 'completa' ? ', análise completa' : ''})`);
+  };
+
   const linhas = canais.map((x) => el('tr', {},
     td(el('div', { class: 'linha firme', style: 'gap:9px' },
       el('span', { class: `logo${arte(x.logo_midia_id) && typeof x.logo_luz === 'number' && x.logo_luz < 0.4 ? ' logo-escuro' : ''}`,
@@ -407,7 +426,8 @@ async function telaCanais(c) {
         ? `reconectando (${x.ao_vivo.tentativas} tentativa${x.ao_vivo.tentativas > 1 ? 's' : ''})`
         : x.fonte === 'rtmp' && x.ao_vivo?.no_ar ? `no ar desde ${dataHora(x.ao_vivo.desde)}`
           : x.sinal_em ? `sinal conferido ${dataHora(x.sinal_em)}` : 'sinal ainda não conferido'),
-      resumoDoSinal(x))),
+      resumoDoSinal(x),
+      partidaDoCanal(x))),
     td(el('div', {}, el('strong', { class: 'pequeno' }, x.agora?.titulo ?? '—'),
       el('div', { class: 'mini apagado' }, `${x.programas_futuros} programa(s) na grade`),
       x.observacao ? el('div', { class: 'mini apagado duas-linhas', style: 'margin-top:4px;max-width:420px' }, x.observacao) : null)),

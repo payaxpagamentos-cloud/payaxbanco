@@ -100,12 +100,28 @@ module.exports = {
     // o servidor atende do próprio disco.
     segundosPorSegmento: Number(process.env.TV_AO_VIVO_SEGMENTO_S) || 2,
     segmentosNaLista: Number(process.env.TV_AO_VIVO_LISTA) || 12,
-    // Quantos pedaços a lista precisa ter antes de o canal ser entregue ao assinante. Três é a
-    // recomendação do próprio HLS (RFC 8216) e o que o hls.js procura: começar a tocar a três
-    // pedaços da ponta. Com um só, o player gruda na ponta sem reserva e trava na primeira
-    // oscilação — foi medido assim. Três pedaços de 4s são 12s de folga, e custam ~8s a mais
-    // para abrir um canal que estava frio.
-    pedacosParaComecar: Number(process.env.TV_AO_VIVO_PEDACOS_INICIO) || 3,
+    // Quando um canal frio é entregue ao assinante: assim que a lista tiver este tanto de
+    // vídeo, em SEGUNDOS, e pelo menos `pedacosParaComecar` pedaços.
+    //
+    // Antes a regra era só "três pedaços". Com pedaço de 4 s isso dava 12 s de espera depois do
+    // primeiro quadro, e com origem de quadro-chave espaçado (pedaço de 8 s) dava 24. Contar em
+    // segundos faz a espera ser a mesma seja qual for o tamanho do pedaço. Oito segundos é a
+    // folga com que o canal começa; com um pedaço só, o player grudava na ponta sem reserva e
+    // travava na primeira oscilação — foi medido assim, e por isso o mínimo de dois pedaços.
+    segundosParaComecar: Number(process.env.TV_AO_VIVO_SEGUNDOS_INICIO) || 8,
+    pedacosParaComecar: Number(process.env.TV_AO_VIVO_PEDACOS_INICIO) || 2,
+    // Tamanho dos PRIMEIROS pedaços de um canal que acabou de ligar. Menores que os de regime,
+    // para a lista juntar os segundos de partida mais cedo e em passos mais finos: com pedaço de
+    // 4 s o canal só podia ser entregue aos 4, 8 ou 12 s; com 2 s, entrega assim que dá.
+    // Depois que a primeira lista enche, o ffmpeg volta sozinho ao tamanho de regime.
+    segundosIniciais: Number(process.env.TV_AO_VIVO_SEGMENTO_INICIAL_S) || 2,
+    // Análise curta do sinal na partida. Por padrão o ffmpeg lê até 5 MB do sinal antes de
+    // começar a gravar, à espera de conhecer todas as faixas — e sinal de TV costuma declarar
+    // faixa que não manda nada (dado, legenda, segundo áudio). Aí ele lê os 5 MB inteiros:
+    // medido, 24 s até o primeiro pedaço, contra 14 s com a análise curta. Era a maior parte
+    // dos "30 segundos para abrir um canal". Se a análise curta não bastar para um sinal, a
+    // conversão falha na hora e a tentativa seguinte usa a análise completa (ver `ligar`).
+    analiseRapida: process.env.TV_AO_VIVO_ANALISE_RAPIDA !== '0',
     // Recodificar o VÍDEO de canal que não vem em H.264 nem H.265 (MPEG-2, por exemplo).
     // Desligado por padrão, e com razão: o remux custa 1,8% de um núcleo por canal; recodificar
     // vídeo custa quase um núcleo inteiro. Com 116 canais, ligar isso para todos derruba o
@@ -140,7 +156,16 @@ module.exports = {
     sobDemanda: process.env.TV_AO_VIVO_SOB_DEMANDA !== '0',
     // Quanto tempo um canal continua convertendo depois que a última tela fechou. Serve para
     // zapear: voltar ao canal anterior dentro desse tempo é instantâneo.
-    ociosoSegundos: Number(process.env.TV_AO_VIVO_OCIOSO_S) || 300,
+    // Quinze minutos: cobre o intervalo comercial, a ida à cozinha e o zapear de volta. Eram
+    // cinco, e o canal esfriava justamente no tempo de um intervalo.
+    ociosoSegundos: Number(process.env.TV_AO_VIVO_OCIOSO_S) || 900,
+    // Canais mantidos quentes SOZINHOS: os mais assistidos dos últimos sete dias ficam
+    // convertendo sempre, e abrem na hora. É o que mais muda a experiência — a maior parte das
+    // aberturas cai em meia dúzia de canais — e dispensa a operação de adivinhar a lista.
+    // Cada canal quente custa cerca de 1% de um núcleo e a banda do próprio sinal (3 a 6 Mbps)
+    // entrando o dia inteiro. Zero desliga; a lista manual (TV_AO_VIVO_QUENTES) continua valendo.
+    quentesAutomaticos: process.env.TV_AO_VIVO_QUENTES_AUTO === undefined || process.env.TV_AO_VIVO_QUENTES_AUTO === ''
+      ? 10 : Math.max(0, Number(process.env.TV_AO_VIVO_QUENTES_AUTO) || 0),
     // Quanto o assinante espera, ao abrir um canal frio, antes de a plataforma desistir.
     //
     // Precisa caber a conversão dos três pedaços iniciais, que ficam prontos lá pelos 12s: um
