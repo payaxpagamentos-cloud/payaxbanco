@@ -497,11 +497,21 @@ async function telaCanais(c) {
     botao('Novo canal', 'primario', async () => { if (await formCanal()) ir('canais'); }, 'mais')),
   // Quantos canais estão sempre ligados e, se não são todos os pedidos, por quê. É a resposta
   // para "mandei ligar todos e este aqui ainda demora": a máquina diz onde parou.
-  quentes && quentes.alvo > 0 ? el('div', { class: `aviso${quentes.limite ? ' atencao' : ''}`, style: 'margin-bottom:14px' },
+  quentes && (quentes.alvo > 0 || quentes.processador) ? el('div', { class: `aviso${quentes.limite || quentes.processador?.maior ? ' atencao' : ''}`, style: 'margin-bottom:14px' },
     el('strong', {}, `Sempre ligados: ${quentes.ligados} de ${quentes.alvo} canal(is)`),
     quentes.todos ? ' (pedido: todos)' : '',
     quentes.limite ? ` — ${quentes.limite}.` : '.',
-    ' Muda em Configurações → Canais ao vivo.') : null,
+    ' Muda em Configurações → Canais ao vivo.',
+    // O processador que as conversões estão usando AGORA, medido. É o número que explica tanto
+    // "por que parou de ligar" quanto "por que os canais estão picotando".
+    quentes.processador ? el('div', { class: 'pequeno', style: 'margin-top:6px' },
+      `Processador das conversões: ${Number(quentes.processador.uso).toLocaleString('pt-BR')} de ${Number(quentes.processador.teto).toLocaleString('pt-BR')} núcleo(s).`,
+      quentes.processador.maior
+        ? ` O canal "${quentes.processador.maior.nome}" sozinho usa ${Number(quentes.processador.maior.uso).toLocaleString('pt-BR')}`
+          + `${quentes.processador.maior.melhoria && quentes.processador.maior.melhoria !== 'nenhuma' ? ' — está com tratamento de imagem: em Editar, volte para "Nenhum"' : ''}.`
+        : '') : null,
+    quentes.tratados ? el('div', { class: 'pequeno', style: 'margin-top:6px' },
+      `${quentes.tratados} canal(is) com tratamento de imagem não ficam sempre ligados: recodificar custa um núcleo ou mais por canal. Eles abrem sob demanda.`) : null) : null,
   tabela(['Canal', 'Situação', 'No ar agora', '>Ações'], linhas, 'Nenhum canal cadastrado. Comece pelo botão "Novo canal".'));
 }
 

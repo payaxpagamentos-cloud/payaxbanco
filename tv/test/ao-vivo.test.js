@@ -642,31 +642,62 @@ test('"todos ligados": sobem aos poucos, param no limite da máquina e aliviam s
   assert.equal(ligados(), 6);
   assert.match(aovivo.resumoDosQuentes().limite, /memória: restam 900 MB/);
 
-  // Processador: com um núcleo só para o app, não sobra nenhum para conversão.
-  config.aoVivo.recursosFixos = { memoriaLivreMB: 8000, nucleos: 1 };
+  // Processador cheio: as conversões já usam o que há para elas (2 núcleos liberados = 0,85
+  // para conversão). Para de ligar, sem desligar ninguém.
+  config.aoVivo.recursosFixos = { memoriaLivreMB: 8000, nucleos: 2 };
+  config.aoVivo.cpuDeTeste = () => 0.14;                 // 6 canais x 0,14 = 0,84 núcleo
   aovivo.sincronizar(s.db);
   assert.equal(ligados(), 6);
-  assert.match(aovivo.resumoDosQuentes().limite, /processador/);
+  assert.match(aovivo.resumoDosQuentes().limite, /processador: as conversões usam/);
 
-  // Memória no fim (abaixo de metade da reserva): um canal quente sem ninguém assistindo é
-  // desligado por rodada, começando pelo último da fila. Melhor isso que o sistema matar o app.
-  config.aoVivo.recursosFixos = { memoriaLivreMB: 300, nucleos: 4 };
+  // O caso que derrubou a operação: UM canal usando mais de um núcleo (era a Globo, com
+  // tratamento de imagem). A conta por "número de canais" dizia que cabia; a medida diz que
+  // não, diz quem é, e alivia desligando um canal sem ninguém assistindo por rodada.
+  config.aoVivo.cpuDeTeste = (id) => (id === ids[0] ? 1.5 : 0.014);
+  assert.match(aovivo.cabeMaisUm().motivo, /só "Todos 1" usa 1,5/);
   aovivo.sincronizar(s.db);
   assert.equal(ligados(), 5);
-  assert.equal(aovivo.situacao(ids[5]).convertendo, false, 'saiu o sexto, o último que tinha subido');
-  assert.match(aovivo.resumoDosQuentes().limite, /foi desligado para aliviar/);
+  assert.equal(aovivo.situacao(ids[5]).convertendo, false, 'saiu o sexto, o último da fila');
+  assert.match(aovivo.resumoDosQuentes().limite, /processador no limite.*foi desligado para aliviar/);
+  assert.equal(aovivo.resumoDosQuentes().processador.maior.nome, 'Todos 1');
+  delete config.aoVivo.cpuDeTeste;
 
-  // Voltou a folga: retoma de onde parou, e chega nos oito.
+  // Memória no fim (abaixo de metade da reserva): mesma saída, um por rodada.
+  config.aoVivo.recursosFixos = { memoriaLivreMB: 300, nucleos: 4 };
+  aovivo.sincronizar(s.db);
+  assert.equal(ligados(), 4);
+  assert.match(aovivo.resumoDosQuentes().limite, /memória no fim.*foi desligado para aliviar/);
+
+  // Voltou a folga: retoma de onde parou (três por rodada) e chega nos oito.
   config.aoVivo.recursosFixos = { memoriaLivreMB: 8000, nucleos: 4 };
+  aovivo.sincronizar(s.db);
+  assert.equal(ligados(), 7);
   aovivo.sincronizar(s.db);
   assert.equal(ligados(), 8);
   painel = (await s.get('/admin/canais', admin)).dados.canais_quentes;
   assert.equal(painel.ligados, 8);
   assert.equal(painel.limite, null, 'todos no ar: não há limite a relatar');
 
-  // E dá para voltar atrás pelo painel: com zero, os canais deixam de ser protegidos e
-  // esfriam sozinhos pelo tempo de ociosidade.
+  // Canal com tratamento de imagem não fica sempre ligado: recodificar custa um núcleo ou mais.
+  assert.equal((await s.patch(`/admin/canais/${ids[7]}`, { melhoria: 'fullhd' }, admin)).status, 200);
+  aovivo.sincronizar(s.db);
+  assert.equal(aovivo.resumoDosQuentes().alvo, 7, 'o tratado saiu da lista dos sempre ligados');
+  assert.equal(aovivo.resumoDosQuentes().tratados, 1);
+  assert.equal(aovivo.situacao(ids[7]).quente, false);
+
+  // Voltar atrás pelo painel desliga NA HORA quem ninguém está assistindo — e não 15 minutos
+  // depois, que era o que acontecia. Quem tem alguém assistindo fica.
+  const cliente = await s.assinante('todos@exemplo.com.br', { plano: 2 });
+  const aberto = await s.post('/play/abrir', { tipo: 'canal', canal_id: ids[0] }, cliente.token, cliente.comPerfil);
+  assert.equal(aberto.status, 201, JSON.stringify(aberto.dados));
+  config.aoVivo.esfriarSemUsoMs = 300;
+  await new Promise((r) => setTimeout(r, 350));
+  // Quem está assistindo pede a lista a cada poucos segundos: é isso que segura o canal.
+  assert.equal((await s.req('GET', aberto.dados.fonte.url.replace(/^.*\/api/, ''))).status, 200);
   assert.equal((await s.put('/admin/config', { canais_quentes: '0' }, admin)).status, 200);
+  aovivo.sincronizar(s.db);
+  assert.equal(aovivo.situacao(ids[0]).convertendo, true, 'canal com gente assistindo não é derrubado');
+  assert.equal(ids.slice(1, 7).filter((id) => aovivo.situacao(id).convertendo).length, 0, 'os outros desligam na hora');
   assert.equal(aovivo.situacao(ids[0]).quente, false);
 });
 

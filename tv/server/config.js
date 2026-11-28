@@ -183,6 +183,9 @@ module.exports = {
     quentesPorRodada: Number(process.env.TV_AO_VIVO_QUENTES_POR_RODADA) || 6,
     // Canal quente só é desligado para aliviar a memória se ninguém o abriu neste intervalo.
     alivioSemUsoMs: 2 * 60_000,
+    // Canal que saiu da lista dos sempre ligados é desligado quando fica este tempo sem nenhum
+    // player pedir a lista dele (quem está assistindo pede a cada poucos segundos).
+    esfriarSemUsoMs: 60_000,
     // Canal ligado "por intenção" (o assinante parou o foco nele, ainda sem abrir) fica de pé
     // só por este tempo se ninguém abrir de fato. Curto de propósito: quem passeia pela lista
     // não pode deixar um rastro de canais convertendo.

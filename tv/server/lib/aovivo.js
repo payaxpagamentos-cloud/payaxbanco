@@ -138,6 +138,10 @@ const partidas = new Map();
 const semAnaliseRapida = new Set();
 // Canais mantidos quentes pela audiência (ver `maisVistos`), refeito a cada sincronização.
 let quentesPorAudiencia = new Set();
+// Quem estava na lista dos sempre ligados na rodada anterior, e quem saiu dela e ainda está de
+// pé esperando para desligar (ver a rodada em `sincronizar`).
+let quentesNaRodadaAnterior = new Set();
+const esfriando = new Set();
 
 /** Espera entre reconexões: 2s, 4s, 8s… até 60s. */
 const esperaDaTentativa = (n) => Math.min(2000 * (2 ** Math.max(0, n - 1)), 60_000);
@@ -218,6 +222,8 @@ function ligar(canal, db) {
   // O número fica guardado porque é por ele que a operação marca um canal como sempre quente
   // (TV_AO_VIVO_QUENTES), e a limpeza de ociosos precisa saber quem não pode desligar.
   estado.numero = canal.numero;
+  estado.nome = canal.nome;
+  estado.melhoria = String(canal.melhoria ?? 'nenhuma');
   vivos.set(canal.id, estado);
 
   // Pasta limpa antes de começar. O processo anterior deste canal pode estar morrendo ainda, e
@@ -450,6 +456,8 @@ function desligarTudo({ esperarMs = 5000 } = {}) {
   partidas.clear();
   semAnaliseRapida.clear();
   quentesPorAudiencia = new Set();
+  quentesNaRodadaAnterior = new Set();
+  esfriando.clear();
   aquecendoPorConta.clear();
   resumoDosQuentes = { todos: false, canais: 0, alvo: 0, ligados: 0, limite: null };
   if (!processos.length) return Promise.resolve();
@@ -484,33 +492,63 @@ function sincronizar(db) {
     //
     // A exceção são os canais quentes: os mais vistos ficam convertendo sempre, para abrirem na
     // hora em vez de fazer o assinante esperar o canal subir toda vez que ele esfria.
+    medirProcessador();
     const quentes = canaisQuentes(canais, db);
+    const manuaisNumeros = new Set(config.aoVivo.quentes);
+    const idsDeAgora = new Set(quentes.map((c) => c.id));
+
+    // Saiu da lista dos sempre ligados (a operação diminuiu a quantidade, ou o canal ganhou
+    // tratamento de imagem): desliga JÁ, se ninguém estiver assistindo. Sem isto, voltar atrás
+    // de "todos" para "os 10 mais vistos" só fazia efeito 15 minutos depois, quando cada canal
+    // esfriasse por conta própria — tempo demais para quem está com a plataforma engasgando.
+    for (const id of quentesNaRodadaAnterior) if (!idsDeAgora.has(id)) esfriando.add(id);
+    quentesNaRodadaAnterior = idsDeAgora;
+    for (const id of [...esfriando]) {
+      const e = vivos.get(id);
+      if (!e || idsDeAgora.has(id)) { esfriando.delete(id); continue; }
+      // Cada pedido de lista de um player marca o uso; um minuto sem isso é canal sem ninguém.
+      if ((e.ultimoUso ?? 0) < Date.now() - config.aoVivo.esfriarSemUsoMs) { desligar(id); esfriando.delete(id); }
+    }
+
     let limite = null;
     let subiram = 0;
     for (const c of quentes) {
       if (vivos.has(c.id)) continue;
-      // Aos poucos: a memória medida na próxima rodada já conta os que subiram nesta.
+      // Aos poucos: a memória e o processador medidos na próxima rodada já contam os desta.
       if (subiram >= config.aoVivo.quentesPorRodada) { limite = 'subindo aos poucos: mais canais na próxima rodada (30 s)'; break; }
       const cabe = cabeMaisUm();
       if (!cabe.cabe) { limite = cabe.motivo; break; }
       ligar(c, db);
       subiram += 1;
     }
-    // A memória apertou de verdade (abaixo de metade da reserva): desliga um canal quente que
-    // ninguém está vendo, o menos assistido deles, por rodada. Antes isso do que o sistema
-    // operacional matar um processo por conta própria — que podia ser o do app.
-    if (recursos().memoriaLivreMB < config.aoVivo.reservaMemoriaMB / 2) {
+
+    // Apertou de verdade — memória abaixo de metade da reserva, ou as conversões usando mais
+    // processador do que há para elas: desliga por rodada um canal quente que ninguém está
+    // vendo. Antes isso do que o sistema matar um processo por conta própria (podia ser o do
+    // app), ou do que todos os canais picotarem por falta de processador.
+    const r = recursos();
+    const usando = processadorEmUso();
+    const tetoCpu = Math.max(0, r.nucleos - 1) * 0.95;
+    const semMemoria = r.memoriaLivreMB < config.aoVivo.reservaMemoriaMB / 2;
+    const semProcessador = usando.total > tetoCpu;
+    if (semMemoria || semProcessador) {
       const semUso = Date.now() - config.aoVivo.alivioSemUsoMs;
-      const sacrificado = [...quentes].reverse().find((c) => vivos.has(c.id) && (vivos.get(c.id).ultimoUso ?? 0) < semUso && !new Set(config.aoVivo.quentes).has(c.numero));
+      const sacrificado = [...quentes].reverse().find((c) => vivos.has(c.id) && (vivos.get(c.id).ultimoUso ?? 0) < semUso && !manuaisNumeros.has(c.numero));
       if (sacrificado) {
         desligar(sacrificado.id);
         quentesPorAudiencia.delete(sacrificado.id);
-        limite = `memória no fim: "${sacrificado.nome}" foi desligado para aliviar (volta a abrir sob demanda)`;
+        limite = `${semMemoria ? 'memória no fim' : `processador no limite (${br(usando.total)} de ${br(tetoCpu)} núcleo(s))`}: "${sacrificado.nome}" foi desligado para aliviar (volta a abrir sob demanda)`;
       }
     }
     limparOciosos();
     const ligadosQuentes = quentes.filter((c) => vivos.has(c.id)).length;
-    resumoDosQuentes = { ...resumoDosQuentes, alvo: quentes.length, ligados: ligadosQuentes, limite: ligadosQuentes < quentes.length ? limite : null };
+    const emUso = processadorEmUso();
+    resumoDosQuentes = {
+      ...resumoDosQuentes, alvo: quentes.length, ligados: ligadosQuentes, limite: ligadosQuentes < quentes.length ? limite : null,
+      // O que as conversões estão usando agora, para o painel mostrar: é o número que explica
+      // tanto "por que parou de ligar" quanto "por que está picotando".
+      processador: { uso: Number(emUso.total.toFixed(2)), teto: Number((Math.max(0, recursos().nucleos - 1) * 0.85).toFixed(2)), maior: emUso.maior && emUso.maior.uso >= 0.3 ? { nome: emUso.maior.nome, uso: Number(emUso.maior.uso.toFixed(2)), melhoria: emUso.maior.melhoria } : null },
+    };
     return { ligados: vivos.size, limitados: 0, sob_demanda: true, quentes: quentes.length };
   }
   const dentroDoTeto = canais.slice(0, config.aoVivo.maxCanais);
@@ -564,22 +602,79 @@ function recursos() {
 
 // Medido: um canal ligado (remux, sem recodificar) usa ~1,4% de um núcleo. Arredondado para cima.
 const NUCLEO_POR_CANAL = 0.015;
+// O que se supõe de um canal antes de haver medida dele (acabou de ligar). Canal com tratamento
+// de imagem é recodificado, e aí a conta é outra: 0,7 de núcleo limpando, 1,6 esticando.
+const SUPOSTO = { nenhuma: NUCLEO_POR_CANAL, limpar: 0.7, fullhd: 1.6 };
+
+/**
+ * Quanto de processador cada conversão está usando DE VERDADE, medido no próprio processo.
+ *
+ * A primeira versão desta proteção multiplicava o número de canais por 1,5% — uma estimativa
+ * tirada de outra máquina, que ainda por cima ignorava o canal recodificado (tratamento de
+ * imagem), que sozinho usa mais de um núcleo. Resultado, na operação: com "todos ligados" e um
+ * canal em tratamento, a conta dizia que cabia e o processador já tinha acabado — áudio
+ * picotando e tela preta em todos os canais.
+ *
+ * Agora o número vem de /proc: os tiques de CPU de cada ffmpeg entre uma rodada e a seguinte.
+ * Vale para qualquer máquina, lenta ou rápida, e para qualquer canal, copiado ou recodificado.
+ */
+const TIQUES_POR_SEGUNDO = 100;   // USER_HZ, fixo em 100 no Linux
+function medirProcessador() {
+  const agoraMs = Date.now();
+  for (const e of vivos.values()) {
+    const pid = e.processo?.pid;
+    if (!pid) { e.cpu = null; e.cpuLido = null; continue; }
+    try {
+      // Depois do ")" que fecha o nome do processo: o 12º e o 13º campos são os tiques em modo
+      // usuário e em modo sistema.
+      const campos = fs.readFileSync(`/proc/${pid}/stat`, 'utf8').split(') ').pop().split(' ');
+      const tiques = Number(campos[11]) + Number(campos[12]);
+      if (e.cpuLido && e.cpuLido.pid === pid && agoraMs - e.cpuLido.em >= 5000) {
+        e.cpu = Math.max(0, (tiques - e.cpuLido.tiques) / TIQUES_POR_SEGUNDO / ((agoraMs - e.cpuLido.em) / 1000));
+        e.cpuLido = { pid, tiques, em: agoraMs };
+      } else if (!e.cpuLido || e.cpuLido.pid !== pid) {
+        e.cpu = null;                                   // processo novo: ainda sem medida
+        e.cpuLido = { pid, tiques, em: agoraMs };
+      }
+    } catch { e.cpu = null; e.cpuLido = null; }         // fora do Linux, ou o processo acabou de sair
+  }
+}
+
+/** Núcleos em uso pelas conversões: o medido de cada canal, ou o suposto para quem acabou de ligar. */
+function processadorEmUso() {
+  let total = 0;
+  let maior = null;
+  for (const [id, e] of vivos) {
+    // (`cpuDeTeste` só existe nos testes: o ffmpeg de mentira não gasta processador nenhum.)
+    const uso = config.aoVivo.cpuDeTeste?.(id, e) ?? e.cpu ?? SUPOSTO[e.melhoria] ?? NUCLEO_POR_CANAL;
+    total += uso;
+    if (!maior || uso > maior.uso) maior = { id, nome: e.nome, uso, melhoria: e.melhoria };
+  }
+  return { total, maior };
+}
+
+const br = (n, casas = 1) => Number(n.toFixed(casas)).toLocaleString('pt-BR');
 
 /**
  * Dá para ligar mais um canal quente? Olha memória e processador, nessa ordem.
  *
  * No processador, um núcleo fica reservado para o app em si (é ele quem atende os assinantes),
- * e do que sobra usa-se até 85%. Com 2 núcleos liberados isso dá uns 56 canais; com 4, uns 170.
+ * e do que sobra as conversões podem usar até 85%.
  */
-function cabeMaisUm() {
+function cabeMaisUm(custo = NUCLEO_POR_CANAL) {
   const r = recursos();
   if (r.memoriaLivreMB < config.aoVivo.reservaMemoriaMB) {
     return { cabe: false, motivo: `memória: restam ${r.memoriaLivreMB} MB livres, e a reserva é de ${config.aoVivo.reservaMemoriaMB} MB` };
   }
-  const porProcessador = Math.floor((Math.max(0, r.nucleos - 1) * 0.85) / NUCLEO_POR_CANAL);
-  if (vivos.size >= porProcessador) {
-    const n = Number(r.nucleos.toFixed(1)).toLocaleString('pt-BR');
-    return { cabe: false, motivo: `processador: ${n} núcleo(s) liberado(s) para o app comportam ${porProcessador} canais (CPUS_APP no .env aumenta)` };
+  const teto = Math.max(0, r.nucleos - 1) * 0.85;
+  const { total, maior } = processadorEmUso();
+  if (total + custo > teto) {
+    // Quando um canal sozinho responde por boa parte do uso, ele é dito pelo nome: quase
+    // sempre é um canal com tratamento de imagem, e a saída é desligar o tratamento dele.
+    const culpado = maior && maior.uso >= 0.3
+      ? ` — só "${maior.nome}"${maior.melhoria && maior.melhoria !== 'nenhuma' ? ', com tratamento de imagem,' : ''} usa ${br(maior.uso)}`
+      : '';
+    return { cabe: false, motivo: `processador: as conversões usam ${br(total)} de ${br(teto)} núcleo(s) disponíveis para elas${culpado} (CPUS_APP no .env libera mais)` };
   }
   return { cabe: true, motivo: null };
 }
@@ -633,8 +728,13 @@ function canaisQuentes(canais, db = null) {
   const alvo = alvoDeQuentes(db);
   const porAudiencia = maisVistos(db, alvo.todos ? 500 : alvo.quantos, { semMinimo: alvo.todos });
   const ordem = new Map(porAudiencia.map((id, i) => [id, i]));
-  const manuais = canais.filter((c) => numeros.has(c.numero));
-  const resto = canais.filter((c) => !numeros.has(c.numero));
+  // Canal com tratamento de imagem nunca fica sempre ligado, nem marcado à mão: recodificar
+  // custa de 0,7 a 1,6 núcleo POR CANAL, e manter isso de pé sem ninguém assistindo tira o
+  // processador de todos os outros. Ele continua abrindo normalmente, sob demanda.
+  const tratado = (c) => c.melhoria && c.melhoria !== 'nenhuma';
+  const manuais = canais.filter((c) => numeros.has(c.numero) && !tratado(c));
+  const resto = canais.filter((c) => !numeros.has(c.numero) && !tratado(c));
+  resumoDosQuentes = { ...resumoDosQuentes, tratados: canais.filter(tratado).length };
   // "Todos": os mais vistos primeiro e depois os demais, na ordem da grade. É a ordem em que
   // sobem — se a máquina não comportar todos, ficam de fora os que menos gente abre.
   const automaticos = alvo.todos
@@ -879,7 +979,7 @@ module.exports = {
   conferirEndereco, conferir, ligar, desligar, desligarTudo, sincronizar, situacao, temSinal,
   pedacosNaLista, resumoDaLista, daParaAssistir, maisVistos, canaisQuentes, partidas, recursos, cabeMaisUm, alvoDeQuentes,
   resumoDosQuentes: () => ({ ...resumoDosQuentes }),
-  aquecer, comAtrasoSrt,
+  aquecer, comAtrasoSrt, medirProcessador, processadorEmUso,
   garantir, marcarUso, limparOciosos,
   listaDoPlayer, caminhoDoPedaco, pastaDoCanal, listaDoCanal,
 };
