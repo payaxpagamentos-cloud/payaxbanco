@@ -43,6 +43,18 @@ BANDEIRA="$PASTA/exige-senha"
 
 mkdir -p "$PASTA"
 
+# Argumento desconhecido não pode passar em silêncio: "-senha" (um hífen só, como algumas telas
+# mostram "--senha") caía direto na rotina do cron, não achava pedido e saía sem dizer nada —
+# e a pessoa ficava achando que tinha cadastrado a senha.
+case "${1:-}" in
+  ""|--instalar|--senha|--sem-senha) ;;
+  *)
+    echo "Opção desconhecida: $1" >&2
+    echo "Use:  --senha (cria ou troca a senha de atualização)   --sem-senha (remove)   --instalar (põe no cron)" >&2
+    echo "São DOIS hifens antes da palavra." >&2
+    exit 2 ;;
+esac
+
 if [ "${1:-}" = "--senha" ]; then
   # A senha é lida do terminal, sem eco, e nunca passa por argumento (apareceria no `ps` e no
   # histórico). TV_NOVA_SENHA existe só para a instalação automática e para os testes.
