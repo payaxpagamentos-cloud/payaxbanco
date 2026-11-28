@@ -540,7 +540,7 @@ async function blocoSistema() {
         cabecalhos: s.exige_senha ? { 'X-Senha-Atualizacao': encodeURIComponent(senha.value) } : {},
       });
       toast('Pacote enviado. Aplicando…');
-      await acompanhar(s.versao.versao);
+      await acompanhar(s.versao.versao, s.ultima?.fim ?? null);
     });
 
     limpar(caixa,
@@ -584,23 +584,35 @@ async function blocoSistema() {
   };
 
   /** Fica consultando até a versão mudar. A plataforma reinicia no meio, então falha é esperada. */
-  const acompanhar = async (versaoAntes) => {
+  /**
+   * O sinal de que terminou é o AGENTE ter fechado uma tentativa nova (`ultima.fim` mudou) com
+   * a fila vazia — e não a versão ter mudado. Olhar só a versão deixava de fora o caso de
+   * reenviar o mesmo pacote: a atualização terminava, a versão continuava igual e a tela
+   * ficava três minutos esperando para então dizer que "está demorando mais que o esperado".
+   */
+  const acompanhar = async (versaoAntes, fimAntes) => {
     const aviso = el('div', { class: 'aviso', style: 'margin-top:14px' }, 'Aplicando a atualização… a plataforma reinicia agora.');
     caixa.append(aviso);
     for (let i = 0; i < 90; i += 1) {
       await new Promise((r) => { setTimeout(r, 2000); });
       try {
         const s = await api.get('/admin/sistema');
-        if (s.versao.versao !== versaoAntes && !s.na_fila) {
-          desenhar(s);
-          toast(`Atualizada para ${s.versao.versao}.`);
-          return;
-        }
-        if (s.ultima?.situacao === 'erro' && !s.na_fila) {
-          desenhar(s);
+        const terminou = !s.na_fila && (s.versao.versao !== versaoAntes || (s.ultima?.fim ?? null) !== fimAntes);
+        if (!terminou) continue;
+        desenhar(s);
+        if (s.ultima?.situacao === 'erro') {
           toast(s.ultima.detalhe || 'A atualização falhou.', true);
           return;
         }
+        if (s.versao.versao === versaoAntes) {
+          toast(`Pacote reaplicado: a versão instalada já era a ${s.versao.versao}.`);
+          return;
+        }
+        toast(`Atualizada para ${s.versao.versao}. Recarregando o painel…`);
+        // O painel aberto ainda é o da versão anterior (o código já estava no navegador).
+        // Recarregar traz as telas novas; a tela aberta é lembrada e volta para cá.
+        setTimeout(() => window.location.reload(), 1500);
+        return;
       } catch { /* a plataforma está reiniciando: continuar tentando */ }
     }
     aviso.textContent = 'A atualização está demorando mais que o esperado. Recarregue a página em instantes.';
